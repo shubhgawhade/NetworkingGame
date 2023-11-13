@@ -1,0 +1,415 @@
+﻿// Asynchronous Server Socket Example
+// http://msdn.microsoft.com/en-us/library/fx6588te.aspx
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Text;
+using System.Threading;
+using UnityEngine;
+
+// State object for reading client data asynchronously
+// public class StateObject
+// {
+//     public string clientName;
+//     // Client  socket.
+//     public Socket workSocket = null;
+//     // Size of receive buffer.
+//     public const int BufferSize = 1024;
+//     // Receive buffer.
+//     public byte[] buffer = new byte[BufferSize];
+//     // Received data string.
+//     public StringBuilder sb = new StringBuilder();  
+// }
+
+public class AsynchronousSocketListener
+{
+    private Socket listener;
+
+    private List<Player> playersConnected;
+    
+    // Thread signal.
+    public static ManualResetEvent allDone = new ManualResetEvent(false);
+
+    public AsynchronousSocketListener() {
+    }
+
+    private void StartListening() {
+        // Data buffer for incoming data.
+        byte[] bytes = new Byte[1024];
+        playersConnected = new();
+
+        // Establish the local endpoint for the socket.
+        // The DNS name of the computer
+        // running the listener is "host.contoso.com".
+        IPHostEntry ipHostInfo = Dns.Resolve(Dns.GetHostName());
+        IPAddress ipAddress = ipHostInfo.AddressList[1];
+        Debug.Log(IPAddress.Parse(ipAddress.ToString()));
+        IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 7777);
+
+        // Create a TCP/IP socket.
+        listener = new Socket(AddressFamily.InterNetwork,
+            SocketType.Stream, ProtocolType.Tcp );
+
+        // Bind the socket to the local endpoint and listen for incoming connections.
+        try {
+            listener.Bind(localEndPoint);
+            listener.Listen(-1);
+
+            while (true) {
+                // Set the event to nonsignaled state.
+                allDone.Reset();
+
+                // Start an asynchronous socket to listen for connections.
+                Debug.Log("Waiting for a connection...");
+                listener.BeginAccept( 
+                    new AsyncCallback(AddConnection),
+                    listener );
+
+                // Wait until a connection is made before continuing.
+                allDone.WaitOne();
+            }
+
+        } catch (Exception e) {
+            Debug.Log(e.ToString());
+        }
+
+        Debug.Log("END");
+        // Console.Read();
+        
+    }
+    
+    private void AddConnection(IAsyncResult ar)
+    {
+        // Signal the main thread to continue.
+        allDone.Set();
+        // Get the socket that handles the client request.
+        Socket listener = (Socket) ar.AsyncState;
+        Socket handler = listener.EndAccept(ar);
+        Player state = new Player();
+
+        state.workSocket = handler;
+        // Debug.Log(IPAddress.Parse(((IPEndPoint)handler.RemoteEndPoint).AddressFamily.ToString()));
+        playersConnected.Add(state);
+        ExternServer.ConnectedPlayers = playersConnected;
+        
+        handler.BeginReceive( state.dataRecd, 0, sizeof(int), 0,
+            new AsyncCallback(CheckForDataLength), state);
+    }
+
+    // private void AcceptCallback(IAsyncResult ar) 
+    // {
+    //     // Signal the main thread to continue.
+    //     allDone.Set();
+    //
+    //     // Get the socket that handles the client request.
+    //     Socket listener = (Socket) ar.AsyncState;
+    //     Socket handler = listener.EndAccept(ar);
+    //     Debug.Log(((IPEndPoint)handler.RemoteEndPoint).Port.ToString());
+    //
+    //     // Create the state object.
+    //     // StateObject state = new StateObject();
+    //     Player state = new Player();
+    //     // state.clientName = a++.ToString();
+    //     state.workSocket = handler;
+    //     // Debug.Log($"{state.data.clientName} CONNECTED!");
+    //     Debug.Log($"{IPAddress.Parse(((IPEndPoint)handler.RemoteEndPoint).Address.ToString())} CONNECTED!");
+    //     handler.BeginReceive( state.dataSize, 0, sizeof(int), 0,
+    //         new AsyncCallback(CheckForDataLength), state);
+    // }
+
+    private void CheckForDataLength(IAsyncResult ar) 
+    {
+        // Retrieve the state object and the handler socket
+        // from the asynchronous state object.
+        // StateObject state = (StateObject) ar.AsyncState;
+
+        Player state = (Player) ar.AsyncState;
+        Socket handler = state.workSocket;
+        
+        int bytesRead = handler.EndReceive(ar);
+
+        if (bytesRead == 0)
+        {
+            QuitClient(handler, state);
+            return;
+        }
+        
+        int size = int.Parse(System.Text.Encoding.ASCII.GetString(state.dataRecd));
+        state.dataRecd = new byte[size];
+        Debug.Log(size);
+        
+        handler.BeginReceive( state.dataRecd, 0, size, 0, 
+            new AsyncCallback(ReceiveData), state);
+    }
+    
+    private void FetchDataLength(IAsyncResult ar) 
+    {
+        // Retrieve the state object and the handler socket
+        // from the asynchronous state object.
+        // StateObject state = (StateObject) ar.AsyncState;
+
+        Player state = (Player) ar.AsyncState;
+        Socket handler = state.workSocket;
+        
+        int bytesRead = handler.EndReceive(ar);
+
+        if (bytesRead == 0)
+        {
+            QuitClient(handler, state);
+            return;
+        }
+        
+        int s = int.Parse(System.Text.Encoding.ASCII.GetString(state.dataRecd));
+        state.dataRecd = new byte[s];
+        Debug.Log(s);
+        handler.BeginReceive( state.dataRecd, 0, s, 0, 
+            new AsyncCallback(SendCallback), state);
+    }
+
+    private void ReceiveData(IAsyncResult ar)
+    {
+        string content;
+        
+        Player state = (Player) ar.AsyncState;
+        Socket handler = state.workSocket;
+        Data data = ByteArrayToObject(state.dataRecd);
+        state.data = data;
+        ExternServer.ConnectedPlayers = playersConnected;
+        
+        // Read data from the client socket. 
+        int bytesRead = handler.EndReceive(ar);
+        
+
+        if (bytesRead == 0)
+        {
+            QuitClient(handler, state);
+            return;
+        }
+        
+        if (bytesRead > 0) 
+        {
+            // Debug.Log(data._dataUpdateType.ToString());
+            // if (data._dataUpdateType == DataUpdateType.Joining)
+
+            // HandleData.Handle(state, data, bytesRead);
+            switch (data._dataUpdateType)
+            {
+                case DataUpdateType.Joining:
+                    
+                    state.playerName = data.playerName;
+                    Debug.Log($"{state.playerName} CONNECTED!");
+                    Reply(state, data);
+
+                    break;
+                
+                case DataUpdateType.Transform:
+                    
+                    content = $"{state.data.pos._posX}, {state.data.pos._posY}, {state.data.pos._posZ}";
+                    Debug.Log($"{state.playerName} : {content}");
+                    Reply(state, data);
+                    
+                    break;
+            }
+            
+            // if (state.playerName == null)
+            // {
+            //     // Debug.Log("HAS JOINING DATA");
+            //     state.playerName = data.playerName;
+            //     Debug.Log($"{state.playerName} CONNECTED!");
+            //     // playersConnected.Add(state);
+            // }
+            
+            
+            // state.sb = new StringBuilder();
+            // There  might be more data, so store the data received so far.
+            // state.sb.Append(Encoding.ASCII.GetString(state.dataRecd, 0, bytesRead));
+
+            // Check for end-of-file tag. If it is not there, read 
+            // more data.
+            
+            // content = $"{state.data.pos._posX}, {state.data.pos._posY}, {state.data.pos._posZ}";
+            // Debug.Log($"{state.playerName} : {content}");
+            state.dataRecd = new byte[sizeof(int)];
+            handler.BeginReceive(state.dataRecd, 0, sizeof(int), 0, 
+                new AsyncCallback(CheckForDataLength), state);
+            // state.sb = new StringBuilder();
+            // Send(handler, content);
+            // if (content.IndexOf("<EOF>") > -1) {
+            //     // All the data has been read from the 
+            //     // client. Display it on the console.
+            //     Console.WriteLine("Read {0} bytes from socket. \n Data : {1}",
+            //         content.Length, content );
+            //     // Echo the data back to the client.
+            //     Send(handler, content);
+            // } else {
+            //     // Not all data received. Get more.
+            //     handler.BeginReceive(state.buffer, 0, StateObject.BufferSize, 0,
+            //     new AsyncCallback(ReadCallback), state);
+            // }
+        }
+    }
+    
+    public byte[] ObjectToByteArray(Data obj)
+    {
+        BinaryFormatter binaryFormatter = new BinaryFormatter();
+        using (var ms = new MemoryStream())
+        {
+            binaryFormatter.Serialize(ms, obj);
+            return ms.ToArray();
+        }
+    }
+    
+    private Data ByteArrayToObject(byte[] arrBytes)
+    {
+        MemoryStream memStream = new MemoryStream();
+        BinaryFormatter binForm = new BinaryFormatter();
+        memStream.Write(arrBytes, 0, arrBytes.Length);
+        memStream.Seek(0, SeekOrigin.Begin);
+        Data obj = (Data) binForm.Deserialize(memStream);
+        return obj;
+    }
+
+    // public static Action ReplyAction;
+    
+    public async void Reply(Player state, Data data)
+    {
+        foreach (Player player in playersConnected)
+        {
+            if (player.playerName != state.playerName)
+            {
+                // Debug.Log($"Sending data to {player.playerName}");
+                Socket handler = player.workSocket;
+                byte[] byteData = ObjectToByteArray(state.data);
+                byte[] sizeOfMsg = new byte[sizeof(int)];
+                sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(byteData.Length.ToString());
+                // Debug.Log(System.Text.Encoding.ASCII.GetString(sizeOfMsg));
+                
+                handler.SendAsync(sizeOfMsg, 0);
+                handler.SendAsync(byteData, 0);
+
+                Debug.Log($"Sent {player.playerName} {System.Text.Encoding.ASCII.GetString(sizeOfMsg)} bytes");
+                    // handler.BeginSend(sizeOfMsg, 0, sizeOfMsg.Length, 0,
+                    //     new AsyncCallback(SendDataInfo), player);
+                // try
+                // {
+                //     // handler.SendAsync(sizeOfMsg, 0);
+                // }
+                // catch (Exception e)
+                // {
+                //     Console.WriteLine(e);
+                //     throw;
+                // }
+                
+                return;
+                // handler.BeginSend(byteData, 0, byteData.Length, 0,
+                //     new AsyncCallback(SendCallback), player);
+            }
+        }
+    }
+    
+    private void Send(Socket handler, String data) {
+        // Convert the string data to byte data using ASCII encoding.
+        byte[] byteData = Encoding.ASCII.GetBytes(data);
+
+        // Begin sending the data to the remote device.
+        // handler.BeginSend(byteData, 0, byteData.Length, 0,
+        //     new AsyncCallback(SendCallback), handler);
+    }
+
+    private void SendDataInfo(IAsyncResult ar)
+    {
+        try {
+            Player state = (Player) ar.AsyncState;
+            // Retrieve the socket from the state object.
+            Socket handler = state.workSocket;
+
+            // Complete sending the data to the remote device.
+            int bytesSent = handler.EndSend(ar);
+            Debug.Log($"Sent {bytesSent} bytes to {state.playerName}.");
+
+            byte[] byteData = ObjectToByteArray(state.data);
+            handler.BeginSend(byteData, 0, byteData.Length, 0,
+                new AsyncCallback(SendCallback), state);
+
+        } catch (Exception e) {
+            Debug.Log(e.ToString());
+        }
+    }
+    
+    private void SendCallback(IAsyncResult ar) {
+        try {
+            Player state = (Player) ar.AsyncState;
+            // Retrieve the socket from the state object.
+            Socket handler = state.workSocket;
+
+            // Complete sending the data to the remote device.
+            int bytesSent = handler.EndSend(ar);
+            Debug.Log($"Sent {bytesSent} bytes to {state.playerName}.");
+
+            // handler.Shutdown(SocketShutdown.Both);
+            // handler.Close();
+
+        } catch (Exception e) {
+            Debug.Log(e.ToString());
+        }
+    }
+
+    private void QuitClient(Socket handler, Player state)
+    {
+        handler.Shutdown(SocketShutdown.Both);
+        handler.Close();
+        Debug.Log($"{state.playerName} DISCONNECTED!");
+        playersConnected.Remove(state);
+    }
+
+    private void ShutDownServer()
+    {
+        foreach (Player player in playersConnected)
+        {
+            try
+            {
+                player.workSocket.Shutdown(SocketShutdown.Both);
+            }
+            finally
+            {
+                player.workSocket.Close();
+            }
+        }
+        
+            listener.Close();
+        // try
+        // {
+        //     listener.Shutdown(SocketShutdown.Send);
+        // }
+        // finally
+        {
+            // asynchronousSocketListener = null;
+        }
+    }
+    
+    static AsynchronousSocketListener asynchronousSocketListener = new AsynchronousSocketListener();
+
+    public static void SD()
+    {
+        // if (asynchronousSocketListener != null)
+        {
+            asynchronousSocketListener.ShutDownServer();
+        }
+    }
+    
+    public static void Main()
+    {
+        if (asynchronousSocketListener != null)
+        {
+            asynchronousSocketListener.StartListening();
+        }
+        
+        // StartListening();
+        // return 0;
+    }
+}
