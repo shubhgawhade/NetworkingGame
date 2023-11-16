@@ -26,8 +26,7 @@ public class ClientNew : MonoBehaviour
         Disconnected
     }
     
-    public float writeTimer;
-    public float readTimer;
+    public float timeSinceLastSend;
     
     // Start is called before the first frame update
     void Start()
@@ -81,44 +80,17 @@ public class ClientNew : MonoBehaviour
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                print(e);
                 throw;
             }
-            
-            // try
-            // {
-            //     byte[] aa = new byte[sizeof(int)];
-            //     await _clientSocket.ReceiveAsync(aa, 0);
-            //     
-            //     // if (player.dataRecd.Length > 0)
-            //     {
-            //         string sizeOfMsgS = System.Text.Encoding.ASCII.GetString(aa);
-            //         print(sizeOfMsgS);
-            //     
-            //         int size = int.Parse(System.Text.Encoding.ASCII.GetString(aa));
-            //         player.dataRecd = new byte[size];
-            //     
-            //         await _clientSocket.ReceiveAsync(player.dataRecd, 0);
-            //         player.data = ByteArrayToObject(player.dataRecd);
-            //         print(player.data.playerName);
-            //     }
-            // }
-            // catch (Exception e)
-            // {
-            //     Console.WriteLine(e);
-            //     throw;
-            // }
 
             ServerPlayer = new Player();
             _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, sizeof(int), 0, 
                 new AsyncCallback(CheckForDataLength), ServerPlayer);
-            
-            // _clientSocket.BeginSend(player.dataRecd, 0, sizeof(int), 0, 
-            //     SendJoiningData, player);
         }
         catch (Exception e)
         {
-            Console.WriteLine(e);
+            print(e);
             throw;
         }
     }
@@ -131,45 +103,37 @@ public class ClientNew : MonoBehaviour
         {
             transform.position += new Vector3(horizontalAxis, 0, 0);
 
-            if (writeTimer > 0.3f)
+            if (timeSinceLastSend > 0.3f)
             {
+                player.data = new Data
+                {
+                    _dataUpdateType = DataUpdateType.Transform,
+                    pos = new Data.Pos
+                    {
+                        _posX = transform.position.x,
+                        _posY = transform.position.y,
+                        _posZ = transform.position.z
+                    }
+                };
+                
+                bytes = ObjectToByteArray(player.data);
+                byte[] sizeOfMsg = new byte[sizeof(int)];
+                sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(bytes.Length.ToString());
+                print(bytes.Length.ToString());
+
+                Send(sizeOfMsg, bytes);
                 // _clientSocket.BeginSend()
-                writeTimer = 0;
+                timeSinceLastSend = 0;
             }
         }
         
-        writeTimer += Time.deltaTime;
-        readTimer += Time.deltaTime;
-        if (readTimer > 0.3f)
-        {
-            // try
-            // {
-            //     await _clientSocket.ReceiveAsync(player.dataRecd, 0);
-            //
-            //     if (player.dataRecd.Length > 0)
-            //     {
-            //         string sizeOfMsg = System.Text.Encoding.ASCII.GetString(player.dataRecd);
-            //         print(sizeOfMsg);
-            //     
-            //         int size = int.Parse(System.Text.Encoding.ASCII.GetString(player.dataRecd));
-            //         player.dataRecd = new byte[size];
-            //
-            //         await _clientSocket.ReceiveAsync(player.dataRecd, 0);
-            //         player.data = ByteArrayToObject(player.dataRecd);
-            //         print(player.data.playerName);
-            //     }
-            // }
-            // catch (Exception e)
-            // {
-            //     Console.WriteLine(e);
-            //     throw;
-            // }
-            
-            // _clientSocket.BeginReceive( player.dataRecd, 0, sizeof(int), 0,
-            //     new AsyncCallback(CheckForDataLength), player);
-            
-            readTimer = 0;
-        }
+        timeSinceLastSend += Time.deltaTime;
+    }
+
+    private async void Send(byte[] sizeOfMsg, byte[] bytesToSend)
+    {
+        await _clientSocket.SendAsync(sizeOfMsg, 0);
+        await _clientSocket.SendAsync(bytesToSend, 0);
     }
 
     private void CheckForDataLength(IAsyncResult ar)
@@ -186,13 +150,22 @@ public class ClientNew : MonoBehaviour
             return;
         }
 
-        if (bytesRead > 0)
+        // if (bytesRead > 0)
         {
             int size = int.Parse(System.Text.Encoding.ASCII.GetString(serverPlayer.dataRecd));
             serverPlayer.dataRecd = new byte[size];
-            print(size);
-            _clientSocket.BeginReceive( serverPlayer.dataRecd, 0, size, 0, 
-                new AsyncCallback(ReceiveData), serverPlayer);
+            // print(size);
+            
+            try
+            {
+                _clientSocket.BeginReceive( serverPlayer.dataRecd, 0, size, 0, 
+                    new AsyncCallback(ReceiveData), serverPlayer);
+            }
+            catch (Exception e)
+            {
+                print(e);
+                throw;
+            }
         }
         
     }
@@ -200,13 +173,16 @@ public class ClientNew : MonoBehaviour
     private void ReceiveData(IAsyncResult ar)
     {
         Player serverPlayer = (Player) ar.AsyncState;
+        print(serverPlayer.dataRecd.Length);
+        
+        // READS SOMETIMES AND FAILS OTHER TIMES
         Data data = ByteArrayToObject(serverPlayer.dataRecd);
         serverPlayer.data = data;
-        // print(data._dataUpdateType);
+        print(data._dataUpdateType);
         
         int bytesRead = _clientSocket.EndReceive(ar);
         
-        // print(bytesRead);
+        print($"{bytesRead} converted");
         // print(player.data.playerName);
 
         // Read data from the client socket. 
@@ -228,7 +204,7 @@ public class ClientNew : MonoBehaviour
             //     new AsyncCallback(CheckForDataLength), serverPlayer);
             
             ServerPlayer = new Player();
-            ServerPlayer.dataRecd = new byte[sizeof(int)];
+            // ServerPlayer.dataRecd = new byte[sizeof(int)];
             _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, sizeof(int), 0, 
                 new AsyncCallback(CheckForDataLength), ServerPlayer);
         }
@@ -236,37 +212,73 @@ public class ClientNew : MonoBehaviour
         // player.dataRecd = new byte[sizeof(int)];
     }
 
-    private async Task ReadMSg()
-    {
-        // _clientSocket.BeginReceive()
-        
-        await _clientSocket.ReceiveAsync(bytes, 0);
-        
-        int s = int.Parse(System.Text.Encoding.ASCII.GetString(bytes));
-        print(s);
-        player.dataRecd = new byte[s];
-        
-        // await _clientSocket.ReceiveAsync(player.dataRecd, 0);
-    }
-
     public byte[] ObjectToByteArray(Data obj)
     {
-        BinaryFormatter binaryFormatter = new BinaryFormatter();
-        using (var ms = new MemoryStream())
+        // BinaryFormatter binaryFormatter = new BinaryFormatter();
+        // using (var ms = new MemoryStream())
+        // {
+        //     binaryFormatter.Serialize(ms, obj);
+        //     return ms.ToArray();
+        // }
+
+        try
         {
-            binaryFormatter.Serialize(ms, obj);
-            return ms.ToArray();
+            // Create new BinaryFormatter
+            BinaryFormatter binaryFormatter = new BinaryFormatter();    
+            // Create target memory stream
+            using MemoryStream memoryStream = new MemoryStream();             
+            // Serialize object to stream
+            binaryFormatter.Serialize(memoryStream, obj);       
+            // Return stream as byte array
+            return memoryStream.ToArray();                              
+        }
+        catch (Exception e)
+        {
+            print(e);
+            throw;
         }
     }
     
     private Data ByteArrayToObject(byte[] arrBytes)
     {
-        MemoryStream memStream = new MemoryStream();
-        BinaryFormatter binForm = new BinaryFormatter();
-        memStream.Write(arrBytes, 0, arrBytes.Length);
-        memStream.Seek(0, SeekOrigin.Begin);
-        Data obj = (Data) binForm.Deserialize(memStream);
-        return obj;
+        // MemoryStream memStream = new MemoryStream();
+        // BinaryFormatter binForm = new BinaryFormatter();
+        // memStream.Write(arrBytes, 0, arrBytes.Length);
+        // memStream.Seek(0, SeekOrigin.Begin);
+        // Data obj = (Data) binForm.Deserialize(memStream);
+        // return obj;
+
+        // try
+        // {
+        //     BinaryFormatter bf = new BinaryFormatter();
+        //     using(MemoryStream ms = new MemoryStream(arrBytes))
+        //     {
+        //         Data obj = (Data) bf.Deserialize(ms);
+        //         return obj;
+        //     }
+        // }
+        // catch (Exception e)
+        // {
+        //     Console.WriteLine(e);
+        //     throw;
+        // }
+
+        try
+        {
+            // Create new BinaryFormatter
+            BinaryFormatter binaryFormatter = new BinaryFormatter(); 
+            // Convert buffer to memorystream
+            using MemoryStream memoryStream = new MemoryStream(arrBytes);
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            // Deserialize stream to an object
+            Data data = (Data) binaryFormatter.Deserialize(memoryStream);
+            return data;
+        }
+        catch (Exception e)
+        {
+            print(e);
+            throw;
+        }
     }
     
     private void SendJoiningData(IAsyncResult ar)

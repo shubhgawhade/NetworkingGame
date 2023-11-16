@@ -2,7 +2,6 @@
 // http://msdn.microsoft.com/en-us/library/fx6588te.aspx
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -11,20 +10,6 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading;
 using UnityEngine;
-
-// State object for reading client data asynchronously
-// public class StateObject
-// {
-//     public string clientName;
-//     // Client  socket.
-//     public Socket workSocket = null;
-//     // Size of receive buffer.
-//     public const int BufferSize = 1024;
-//     // Receive buffer.
-//     public byte[] buffer = new byte[BufferSize];
-//     // Received data string.
-//     public StringBuilder sb = new StringBuilder();  
-// }
 
 public class AsynchronousSocketListener
 {
@@ -35,51 +20,47 @@ public class AsynchronousSocketListener
     // Thread signal.
     public static ManualResetEvent allDone = new ManualResetEvent(false);
 
-    public AsynchronousSocketListener() {
-    }
-
-    private void StartListening() {
-        // Data buffer for incoming data.
-        byte[] bytes = new Byte[1024];
+    private void StartListening() 
+    {
+        
         playersConnected = new();
 
         // Establish the local endpoint for the socket.
         // The DNS name of the computer
-        // running the listener is "host.contoso.com".
         IPHostEntry ipHostInfo = Dns.Resolve(Dns.GetHostName());
         IPAddress ipAddress = ipHostInfo.AddressList[1];
         Debug.Log(IPAddress.Parse(ipAddress.ToString()));
         IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 7777);
 
         // Create a TCP/IP socket.
-        listener = new Socket(AddressFamily.InterNetwork,
-            SocketType.Stream, ProtocolType.Tcp );
+        listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );
 
         // Bind the socket to the local endpoint and listen for incoming connections.
-        try {
+        try 
+        {
             listener.Bind(localEndPoint);
             listener.Listen(-1);
 
-            while (true) {
+            while (true) 
+            {
                 // Set the event to nonsignaled state.
                 allDone.Reset();
 
                 // Start an asynchronous socket to listen for connections.
                 Debug.Log("Waiting for a connection...");
-                listener.BeginAccept( 
-                    new AsyncCallback(AddConnection),
-                    listener );
+                listener.BeginAccept(new AsyncCallback(AddConnection), listener);
 
                 // Wait until a connection is made before continuing.
                 allDone.WaitOne();
             }
 
-        } catch (Exception e) {
+        }
+        catch (Exception e) 
+        {
             Debug.Log(e.ToString());
         }
 
         Debug.Log("END");
-        // Console.Read();
         
     }
     
@@ -100,27 +81,6 @@ public class AsynchronousSocketListener
         handler.BeginReceive( state.dataRecd, 0, sizeof(int), 0,
             new AsyncCallback(CheckForDataLength), state);
     }
-
-    // private void AcceptCallback(IAsyncResult ar) 
-    // {
-    //     // Signal the main thread to continue.
-    //     allDone.Set();
-    //
-    //     // Get the socket that handles the client request.
-    //     Socket listener = (Socket) ar.AsyncState;
-    //     Socket handler = listener.EndAccept(ar);
-    //     Debug.Log(((IPEndPoint)handler.RemoteEndPoint).Port.ToString());
-    //
-    //     // Create the state object.
-    //     // StateObject state = new StateObject();
-    //     Player state = new Player();
-    //     // state.clientName = a++.ToString();
-    //     state.workSocket = handler;
-    //     // Debug.Log($"{state.data.clientName} CONNECTED!");
-    //     Debug.Log($"{IPAddress.Parse(((IPEndPoint)handler.RemoteEndPoint).Address.ToString())} CONNECTED!");
-    //     handler.BeginReceive( state.dataSize, 0, sizeof(int), 0,
-    //         new AsyncCallback(CheckForDataLength), state);
-    // }
 
     private void CheckForDataLength(IAsyncResult ar) 
     {
@@ -146,30 +106,6 @@ public class AsynchronousSocketListener
         handler.BeginReceive( state.dataRecd, 0, size, 0, 
             new AsyncCallback(ReceiveData), state);
     }
-    
-    private void FetchDataLength(IAsyncResult ar) 
-    {
-        // Retrieve the state object and the handler socket
-        // from the asynchronous state object.
-        // StateObject state = (StateObject) ar.AsyncState;
-
-        Player state = (Player) ar.AsyncState;
-        Socket handler = state.workSocket;
-        
-        int bytesRead = handler.EndReceive(ar);
-
-        if (bytesRead == 0)
-        {
-            QuitClient(handler, state);
-            return;
-        }
-        
-        int s = int.Parse(System.Text.Encoding.ASCII.GetString(state.dataRecd));
-        state.dataRecd = new byte[s];
-        Debug.Log(s);
-        handler.BeginReceive( state.dataRecd, 0, s, 0, 
-            new AsyncCallback(SendCallback), state);
-    }
 
     private void ReceiveData(IAsyncResult ar)
     {
@@ -193,9 +129,6 @@ public class AsynchronousSocketListener
         
         if (bytesRead > 0) 
         {
-            // Debug.Log(data._dataUpdateType.ToString());
-            // if (data._dataUpdateType == DataUpdateType.Joining)
-
             // HandleData.Handle(state, data, bytesRead);
             switch (data._dataUpdateType)
             {
@@ -203,7 +136,7 @@ public class AsynchronousSocketListener
                     
                     state.playerName = data.playerName;
                     Debug.Log($"{state.playerName} CONNECTED!");
-                    Reply(state, data);
+                    ReplyAll(state, data, state.dataRecd);
 
                     break;
                 
@@ -211,7 +144,7 @@ public class AsynchronousSocketListener
                     
                     content = $"{state.data.pos._posX}, {state.data.pos._posY}, {state.data.pos._posZ}";
                     Debug.Log($"{state.playerName} : {content}");
-                    Reply(state, data);
+                    ReplyAll(state, data, state.dataRecd);
                     
                     break;
             }
@@ -256,27 +189,69 @@ public class AsynchronousSocketListener
     
     public byte[] ObjectToByteArray(Data obj)
     {
-        BinaryFormatter binaryFormatter = new BinaryFormatter();
-        using (var ms = new MemoryStream())
+        // BinaryFormatter binaryFormatter = new BinaryFormatter();
+        // using (var ms = new MemoryStream())
+        // {
+        //     binaryFormatter.Serialize(ms, obj);
+        //     return ms.ToArray();
+        // }
+        
+        try
         {
-            binaryFormatter.Serialize(ms, obj);
-            return ms.ToArray();
+            // Create new BinaryFormatter
+            BinaryFormatter binaryFormatter = new BinaryFormatter();    
+            // Create target memory stream
+            using MemoryStream memoryStream = new MemoryStream();             
+            // Serialize object to stream
+            binaryFormatter.Serialize(memoryStream, obj); 
+            memoryStream.Close();
+            // Return stream as byte array
+            return memoryStream.ToArray();                              
+        }
+        catch (Exception e)
+        {
+            Debug.Log(e);
+            throw;
         }
     }
     
     private Data ByteArrayToObject(byte[] arrBytes)
     {
-        MemoryStream memStream = new MemoryStream();
-        BinaryFormatter binForm = new BinaryFormatter();
-        memStream.Write(arrBytes, 0, arrBytes.Length);
-        memStream.Seek(0, SeekOrigin.Begin);
-        Data obj = (Data) binForm.Deserialize(memStream);
-        return obj;
+        // MemoryStream memStream = new MemoryStream();
+        // BinaryFormatter binForm = new BinaryFormatter();
+        // memStream.Write(arrBytes, 0, arrBytes.Length);
+        // memStream.Seek(0, SeekOrigin.Begin);
+        // Data obj = (Data) binForm.Deserialize(memStream);
+        // return obj;
+        
+        // BinaryFormatter bf = new BinaryFormatter();
+        // using(MemoryStream ms = new MemoryStream(arrBytes))
+        // {
+        //     Data obj = (Data) bf.Deserialize(ms);
+        //     return obj;
+        // }
+        
+        try
+        {
+            // Create new BinaryFormatter
+            BinaryFormatter binaryFormatter = new BinaryFormatter(); 
+            // Convert buffer to memorystream
+            using MemoryStream memoryStream = new MemoryStream(arrBytes); 
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            // Deserialize stream to an object
+            Data data = (Data) binaryFormatter.Deserialize(memoryStream);
+            return data;
+        }
+        catch (Exception e)
+        {
+            Debug.Log(e);
+            throw;
+        }
     }
 
     // public static Action ReplyAction;
     
-    public async void Reply(Player state, Data data)
+    public async void ReplyAll(Player state, Data data, byte[] dataRecd)
     {
         foreach (Player player in playersConnected)
         {
@@ -284,17 +259,26 @@ public class AsynchronousSocketListener
             {
                 // Debug.Log($"Sending data to {player.playerName}");
                 Socket handler = player.workSocket;
-                byte[] byteData = ObjectToByteArray(state.data);
+                byte[] byteData = dataRecd; //ObjectToByteArray(state.data);
                 byte[] sizeOfMsg = new byte[sizeof(int)];
                 sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(byteData.Length.ToString());
                 // Debug.Log(System.Text.Encoding.ASCII.GetString(sizeOfMsg));
-                
-                handler.SendAsync(sizeOfMsg, 0);
-                handler.SendAsync(byteData, 0);
+
+                try
+                {
+                    await handler.SendAsync(sizeOfMsg, 0);
+                    await handler.SendAsync(byteData, 0);
+                }
+                catch (Exception e)
+                {
+                    Debug.Log(e);
+                    throw;
+                }
 
                 Debug.Log($"Sent {player.playerName} {System.Text.Encoding.ASCII.GetString(sizeOfMsg)} bytes");
-                    // handler.BeginSend(sizeOfMsg, 0, sizeOfMsg.Length, 0,
-                    //     new AsyncCallback(SendDataInfo), player);
+                    
+                // handler.BeginSend(sizeOfMsg, 0, sizeOfMsg.Length, 0,
+                //     new AsyncCallback(SendDataInfo), player);
                 // try
                 // {
                 //     // handler.SendAsync(sizeOfMsg, 0);
@@ -305,7 +289,7 @@ public class AsynchronousSocketListener
                 //     throw;
                 // }
                 
-                return;
+                // return;
                 // handler.BeginSend(byteData, 0, byteData.Length, 0,
                 //     new AsyncCallback(SendCallback), player);
             }
@@ -381,22 +365,23 @@ public class AsynchronousSocketListener
             }
         }
         
-            listener.Close();
+        listener.Close();
+        
         // try
         // {
         //     listener.Shutdown(SocketShutdown.Send);
         // }
         // finally
-        {
-            // asynchronousSocketListener = null;
-        }
+        // {
+        //     asynchronousSocketListener = null;
+        // }
     }
     
     static AsynchronousSocketListener asynchronousSocketListener = new AsynchronousSocketListener();
 
     public static void SD()
     {
-        // if (asynchronousSocketListener != null)
+        if (asynchronousSocketListener != null)
         {
             asynchronousSocketListener.ShutDownServer();
         }

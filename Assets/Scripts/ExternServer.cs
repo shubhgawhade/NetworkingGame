@@ -24,7 +24,7 @@ public class ExternServer : MonoBehaviour
         // Enable Start option
         if (CONNECTIONS.Count == 2)
         {
-            print("START GAME");
+            // print("START GAME");
         }
         
         // print(CONNECTIONS[0].data.pos._posX);
