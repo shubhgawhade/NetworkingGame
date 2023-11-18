@@ -77,11 +77,12 @@ public class AsynchronousSocketListener
         // Debug.Log(IPAddress.Parse(((IPEndPoint)handler.RemoteEndPoint).AddressFamily.ToString()));
         playersConnected.Add(state);
         ExternServer.ConnectedPlayers = playersConnected;
-        
-        handler.BeginReceive( state.dataRecd, 0, sizeof(int), 0,
+
+        handler.BeginReceive( state.dataRecd, 0, 0, 0,
             new AsyncCallback(CheckForDataLength), state);
     }
 
+    string sizeRecd = "";
     private void CheckForDataLength(IAsyncResult ar) 
     {
         // Retrieve the state object and the handler socket
@@ -93,18 +94,46 @@ public class AsynchronousSocketListener
         
         int bytesRead = handler.EndReceive(ar);
 
-        if (bytesRead == 0)
+        // if (bytesRead == 0)
+        // {
+        //     QuitClient(handler, state);
+        //     return;
+        // }
+
+        // Debug.Log(System.Text.Encoding.ASCII.GetString(state.dataRecd));
+        // if (System.Text.Encoding.ASCII.GetString(state.dataRecd) != "|")
+        // {
+        //     sizeRecd += System.Text.Encoding.ASCII.GetString(state.dataRecd);
+        // }
+        // else
+        // {
+        //     int size = int.Parse(sizeRecd);
+        //     state.dataRecd = new byte[size];
+        //     Debug.Log(size);
+        //     
+        //     handler.BeginReceive( state.dataRecd, 0, size, 0, 
+        //         new AsyncCallback(ReceiveData), state);
+        // }
+
+        // for (int i = 0; i < 4; i++)
         {
-            QuitClient(handler, state);
-            return;
+            bytesRead = handler.Receive(state.dataRecd, 0);
+            if (bytesRead == 0)
+            {
+                QuitClient(handler, state);
+                return;
+            }
+            
         }
         
+        Debug.Log(bytesRead);
         int size = int.Parse(System.Text.Encoding.ASCII.GetString(state.dataRecd));
         state.dataRecd = new byte[size];
         Debug.Log(size);
         
         handler.BeginReceive( state.dataRecd, 0, size, 0, 
             new AsyncCallback(ReceiveData), state);
+        
     }
 
     private void ReceiveData(IAsyncResult ar)
@@ -168,7 +197,7 @@ public class AsynchronousSocketListener
             // content = $"{state.data.pos._posX}, {state.data.pos._posY}, {state.data.pos._posZ}";
             // Debug.Log($"{state.playerName} : {content}");
             state.dataRecd = new byte[sizeof(int)];
-            handler.BeginReceive(state.dataRecd, 0, sizeof(int), 0, 
+            handler.BeginReceive(state.dataRecd, 0, 0, 0, 
                 new AsyncCallback(CheckForDataLength), state);
             // state.sb = new StringBuilder();
             // Send(handler, content);
@@ -260,8 +289,8 @@ public class AsynchronousSocketListener
                 // Debug.Log($"Sending data to {player.playerName}");
                 Socket handler = player.workSocket;
                 byte[] byteData = dataRecd; //ObjectToByteArray(state.data);
-                byte[] sizeOfMsg = new byte[sizeof(int)];
-                sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(byteData.Length.ToString());
+                // byte[] sizeOfMsg = new byte[sizeof(int)];
+                byte[] sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(byteData.Length.ToString());
                 // Debug.Log(System.Text.Encoding.ASCII.GetString(sizeOfMsg));
 
                 try

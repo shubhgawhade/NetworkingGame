@@ -20,6 +20,7 @@ public class Player
     public Socket workSocket = null;
 
     public string playerName;
+    // public float health;
     // Size of receive buffer.
     // public static int BufferSize = sizeof(int);
     // Receive buffer.
@@ -69,4 +70,6 @@ public class Data
     }
 
     public Rot rot;
+
+    // public float health;
 }

@@ -13,6 +13,7 @@ public class ClientNew : MonoBehaviour
     private Socket _clientSocket;
     static readonly Int32 Port = 7777;
     private static readonly IPAddress ServerAddress = IPAddress.Parse("192.168.0.118");
+    // private static readonly IPAddress ServerAddress = IPAddress.Parse("127.0.0.1");
     
     // is NULL till the client joins the server(client -> player)
     public Player player;
@@ -71,7 +72,7 @@ public class ClientNew : MonoBehaviour
             bytes = ObjectToByteArray(player.data);
             byte[] sizeOfMsg = new byte[sizeof(int)];
             sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(bytes.Length.ToString());
-            print(bytes.Length.ToString());
+            print(bytes.Length);
 
             try
             {
@@ -85,7 +86,7 @@ public class ClientNew : MonoBehaviour
             }
 
             ServerPlayer = new Player();
-            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, sizeof(int), 0, 
+            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 3, 0, 
                 new AsyncCallback(CheckForDataLength), ServerPlayer);
         }
         catch (Exception e)
@@ -119,7 +120,7 @@ public class ClientNew : MonoBehaviour
                 bytes = ObjectToByteArray(player.data);
                 byte[] sizeOfMsg = new byte[sizeof(int)];
                 sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(bytes.Length.ToString());
-                print(bytes.Length.ToString());
+                print(bytes.Length);
 
                 Send(sizeOfMsg, bytes);
                 // _clientSocket.BeginSend()
@@ -177,12 +178,18 @@ public class ClientNew : MonoBehaviour
         
         // READS SOMETIMES AND FAILS OTHER TIMES
         Data data = ByteArrayToObject(serverPlayer.dataRecd);
+        
+        if (data._dataUpdateType == DataUpdateType.Transform)
+        {
+            print(data.pos._posX);
+        }
+        
         serverPlayer.data = data;
         print(data._dataUpdateType);
         
         int bytesRead = _clientSocket.EndReceive(ar);
         
-        print($"{bytesRead} converted");
+        // print($"{bytesRead} converted");
         // print(player.data.playerName);
 
         // Read data from the client socket. 
@@ -197,7 +204,7 @@ public class ClientNew : MonoBehaviour
 
         if (bytesRead > 0)
         {
-            print(serverPlayer.data._dataUpdateType);
+            // print($"{data.pos._posX}");
             
             // serverPlayer.dataRecd = new byte[sizeof(int)];
             // _clientSocket.BeginReceive( serverPlayer.dataRecd, 0, sizeof(int), 0,
@@ -205,7 +212,7 @@ public class ClientNew : MonoBehaviour
             
             ServerPlayer = new Player();
             // ServerPlayer.dataRecd = new byte[sizeof(int)];
-            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, sizeof(int), 0, 
+            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 3, 0, 
                 new AsyncCallback(CheckForDataLength), ServerPlayer);
         }
 
