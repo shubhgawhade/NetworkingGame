@@ -60,19 +60,24 @@ public class ClientNew : MonoBehaviour
             Debug.Log("NEW PLAYER CREATED");
             player = new Player
             {
-                data = new Data
-                {
-                    _dataUpdateType = DataUpdateType.Joining,
-                    playerName = Random.Range(0, 100).ToString()
-                }
+                dataUpdateType = DataUpdateType.Joining,
+                // data = new Data
+                // {
+                //     playerName = Random.Range(0, 100).ToString()
+                // }
             };
                 
-            player.playerName = player.data.playerName;
+            // player.playerName = player.data.playerName;
+            JoiningData joiningData = (JoiningData)player.returnDataStruct;
+            joiningData.playerName = Random.Range(0, 100).ToString();
+            player.playerName = joiningData.playerName;
+            // print(joiningData.playerName);
 
-            bytes = ObjectToByteArray(player.data);
+            bytes = player.ObjectToByteArray(joiningData);
+            // bytes = ObjectToByteArray(player.data);
             byte[] sizeOfMsg = new byte[sizeof(int)];
-            sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(bytes.Length.ToString());
-            print(bytes.Length);
+            sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(bytes.Length.ToString() + (int)player.dataUpdateType);
+            print(bytes.Length.ToString() + (int)player.dataUpdateType);
 
             try
             {
@@ -86,7 +91,7 @@ public class ClientNew : MonoBehaviour
             }
 
             ServerPlayer = new Player();
-            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 3, 0, 
+            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 4, 0, 
                 new AsyncCallback(CheckForDataLength), ServerPlayer);
         }
         catch (Exception e)
@@ -106,21 +111,31 @@ public class ClientNew : MonoBehaviour
 
             if (timeSinceLastSend > 0.3f)
             {
-                player.data = new Data
-                {
-                    _dataUpdateType = DataUpdateType.Transform,
-                    pos = new Data.Pos
-                    {
-                        _posX = transform.position.x,
-                        _posY = transform.position.y,
-                        _posZ = transform.position.z
-                    }
-                };
+                player.dataUpdateType = DataUpdateType.Transform;
+                // player.data = new Data
+                // {
+                //     pos = new Data.Pos
+                //     {
+                //         _posX = transform.position.x,
+                //         _posY = transform.position.y,
+                //         _posZ = transform.position.z
+                //     }
+                // };
                 
-                bytes = ObjectToByteArray(player.data);
+                TransformData transformData = (TransformData)player.returnDataStruct;
+                transformData.pos = new TransformData.Pos
+                {
+                    _posX = transform.position.x,
+                    _posY = transform.position.y,
+                    _posZ = transform.position.z
+                };
+
+                
+                bytes = player.ObjectToByteArray(transformData);
                 byte[] sizeOfMsg = new byte[sizeof(int)];
-                sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(bytes.Length.ToString());
-                print(bytes.Length);
+                sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(bytes.Length.ToString() + (int)player.dataUpdateType);
+                print(bytes.Length.ToString() + (int)player.dataUpdateType);
+                // print(bytes.Length);
 
                 Send(sizeOfMsg, bytes);
                 // _clientSocket.BeginSend()
@@ -151,9 +166,20 @@ public class ClientNew : MonoBehaviour
             return;
         }
 
+        Debug.Log(bytesRead);
+        byte[] sizeVal = new byte[bytesRead - 1];
+        byte[] updateType = new byte[1];
+        updateType[0] = serverPlayer.dataRecd[bytesRead - 1];
+        // state.updateVal = ;
+        serverPlayer.dataUpdateType = (DataUpdateType)int.Parse(System.Text.Encoding.ASCII.GetString(updateType));
+        for (int i = 0; i < bytesRead - 1; i++)
+        {
+            sizeVal[i] = serverPlayer.dataRecd[i];
+        }
+        
         // if (bytesRead > 0)
         {
-            int size = int.Parse(System.Text.Encoding.ASCII.GetString(serverPlayer.dataRecd));
+            int size = int.Parse(System.Text.Encoding.ASCII.GetString(sizeVal));
             serverPlayer.dataRecd = new byte[size];
             // print(size);
             
@@ -176,16 +202,18 @@ public class ClientNew : MonoBehaviour
         Player serverPlayer = (Player) ar.AsyncState;
         print(serverPlayer.dataRecd.Length);
         
+        byte[] aa = serverPlayer.dataRecd;
+
         // READS SOMETIMES AND FAILS OTHER TIMES
-        Data data = ByteArrayToObject(serverPlayer.dataRecd);
-        
-        if (data._dataUpdateType == DataUpdateType.Transform)
-        {
-            print(data.pos._posX);
-        }
-        
-        serverPlayer.data = data;
-        print(data._dataUpdateType);
+        // Data data = ByteArrayToObject(serverPlayer.dataRecd);
+        //
+        // if (serverPlayer.dataUpdateType == DataUpdateType.Transform)
+        // {
+        //     print(data.pos._posX);
+        // }
+        //
+        // // serverPlayer.data = data;
+        // print(serverPlayer.dataUpdateType);
         
         int bytesRead = _clientSocket.EndReceive(ar);
         
@@ -204,6 +232,32 @@ public class ClientNew : MonoBehaviour
 
         if (bytesRead > 0)
         {
+            switch (serverPlayer.dataUpdateType)
+            {
+                case DataUpdateType.Joining:
+                    
+                    // state.playerName = data.playerName;
+                    // Debug.Log($"{state.playerName} CONNECTED!");
+                    JoiningData joiningData = (JoiningData)serverPlayer.ByteArrayToObject(aa);
+                    // if (state.playerName == null)
+                    {
+                        // Debug.Log("HAS JOINING DATA");
+                        // state.playerName = joiningData.playerName;
+                        Debug.Log($"{joiningData.playerName} CONNECTED!");
+                        // playersConnected.Add(state);
+                    }
+            
+                    break;
+                
+                case DataUpdateType.Transform:
+
+                    TransformData transformData = (TransformData)serverPlayer.ByteArrayToObject(aa);
+                    string content = $"{transformData.pos._posX}, {transformData.pos._posY}, {transformData.pos._posZ}";
+                    Debug.Log($"{serverPlayer.playerName} : {content}");
+                    
+                    break;
+            }
+            
             // print($"{data.pos._posX}");
             
             // serverPlayer.dataRecd = new byte[sizeof(int)];
@@ -212,7 +266,7 @@ public class ClientNew : MonoBehaviour
             
             ServerPlayer = new Player();
             // ServerPlayer.dataRecd = new byte[sizeof(int)];
-            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 3, 0, 
+            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 4, 0, 
                 new AsyncCallback(CheckForDataLength), ServerPlayer);
         }
 

@@ -127,8 +127,18 @@ public class AsynchronousSocketListener
         }
         
         Debug.Log(bytesRead);
-        int size = int.Parse(System.Text.Encoding.ASCII.GetString(state.dataRecd));
+        byte[] sizeVal = new byte[bytesRead - 1];
+        byte[] updateType = new byte[1];
+        updateType[0] = state.dataRecd[bytesRead - 1];
+        // state.updateVal = ;
+        state.dataUpdateType = (DataUpdateType)int.Parse(System.Text.Encoding.ASCII.GetString(updateType));
+        for (int i = 0; i < bytesRead - 1; i++)
+        {
+           sizeVal[i] = state.dataRecd[i];
+        }
+        int size = int.Parse(System.Text.Encoding.ASCII.GetString(sizeVal));
         state.dataRecd = new byte[size];
+        // Debug.Log(state.updateVal);
         Debug.Log(size);
         
         handler.BeginReceive( state.dataRecd, 0, size, 0, 
@@ -142,8 +152,9 @@ public class AsynchronousSocketListener
         
         Player state = (Player) ar.AsyncState;
         Socket handler = state.workSocket;
-        Data data = ByteArrayToObject(state.dataRecd);
-        state.data = data;
+        byte[] aa = state.dataRecd;
+        // Data data = ByteArrayToObject(state.dataRecd);
+        // state.data = data;
         ExternServer.ConnectedPlayers = playersConnected;
         
         // Read data from the client socket. 
@@ -159,21 +170,30 @@ public class AsynchronousSocketListener
         if (bytesRead > 0) 
         {
             // HandleData.Handle(state, data, bytesRead);
-            switch (data._dataUpdateType)
+            switch (state.dataUpdateType)
             {
                 case DataUpdateType.Joining:
                     
-                    state.playerName = data.playerName;
-                    Debug.Log($"{state.playerName} CONNECTED!");
-                    ReplyAll(state, data, state.dataRecd);
-
+                    // state.playerName = data.playerName;
+                    // Debug.Log($"{state.playerName} CONNECTED!");
+                    JoiningData joiningData = (JoiningData)state.ByteArrayToObject(aa);
+                    if (state.playerName == null)
+                    {
+                        // Debug.Log("HAS JOINING DATA");
+                        state.playerName = joiningData.playerName;
+                        Debug.Log($"{state.playerName} CONNECTED!");
+                        // playersConnected.Add(state);
+                    }
+                    ReplyAll(state, state.dataRecd);
+            
                     break;
                 
                 case DataUpdateType.Transform:
-                    
-                    content = $"{state.data.pos._posX}, {state.data.pos._posY}, {state.data.pos._posZ}";
+
+                    TransformData transformData = (TransformData)state.ByteArrayToObject(aa);
+                    content = $"{transformData.pos._posX}, {transformData.pos._posY}, {transformData.pos._posZ}";
                     Debug.Log($"{state.playerName} : {content}");
-                    ReplyAll(state, data, state.dataRecd);
+                    ReplyAll(state, state.dataRecd);
                     
                     break;
             }
@@ -280,7 +300,7 @@ public class AsynchronousSocketListener
 
     // public static Action ReplyAction;
     
-    public async void ReplyAll(Player state, Data data, byte[] dataRecd)
+    public async void ReplyAll(Player state, byte[] dataRecd)
     {
         foreach (Player player in playersConnected)
         {
@@ -290,7 +310,7 @@ public class AsynchronousSocketListener
                 Socket handler = player.workSocket;
                 byte[] byteData = dataRecd; //ObjectToByteArray(state.data);
                 // byte[] sizeOfMsg = new byte[sizeof(int)];
-                byte[] sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(byteData.Length.ToString());
+                byte[] sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(byteData.Length.ToString() + (int)state.dataUpdateType);
                 // Debug.Log(System.Text.Encoding.ASCII.GetString(sizeOfMsg));
 
                 try
@@ -334,25 +354,25 @@ public class AsynchronousSocketListener
         //     new AsyncCallback(SendCallback), handler);
     }
 
-    private void SendDataInfo(IAsyncResult ar)
-    {
-        try {
-            Player state = (Player) ar.AsyncState;
-            // Retrieve the socket from the state object.
-            Socket handler = state.workSocket;
-
-            // Complete sending the data to the remote device.
-            int bytesSent = handler.EndSend(ar);
-            Debug.Log($"Sent {bytesSent} bytes to {state.playerName}.");
-
-            byte[] byteData = ObjectToByteArray(state.data);
-            handler.BeginSend(byteData, 0, byteData.Length, 0,
-                new AsyncCallback(SendCallback), state);
-
-        } catch (Exception e) {
-            Debug.Log(e.ToString());
-        }
-    }
+    // private void SendDataInfo(IAsyncResult ar)
+    // {
+    //     try {
+    //         Player state = (Player) ar.AsyncState;
+    //         // Retrieve the socket from the state object.
+    //         Socket handler = state.workSocket;
+    //
+    //         // Complete sending the data to the remote device.
+    //         int bytesSent = handler.EndSend(ar);
+    //         Debug.Log($"Sent {bytesSent} bytes to {state.playerName}.");
+    //
+    //         byte[] byteData = ObjectToByteArray(state.data);
+    //         handler.BeginSend(byteData, 0, byteData.Length, 0,
+    //             new AsyncCallback(SendCallback), state);
+    //
+    //     } catch (Exception e) {
+    //         Debug.Log(e.ToString());
+    //     }
+    // }
     
     private void SendCallback(IAsyncResult ar) {
         try {
