@@ -16,7 +16,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &871732265807938886
 Transform:
   m_ObjectHideFlags: 0
@@ -44,34 +44,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5bb07bd3883bbe4586cb5517d25f2d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player:
+  localPlayer:
     playerName: 
+    PlayerID: 0
+    ready: 0
     dataRecd: 00000000
-    data:
-      _dataUpdateType: 0
-      playerName: 
-      pos:
-        _posX: 0
-        _posY: 0
-        _posZ: 0
-      rot:
-        _rotX: 0
-        _rotY: 0
-        _rotZ: 0
+    dataToSend: 00000000
+    dataUpdateType: 0
   clientStatus: 0
-  writeTimer: 0
-  readTimer: 0
+  playersConnected: []
+  timeSinceLastSend: 0
   ServerPlayer:
     playerName: 
+    PlayerID: 0
+    ready: 0
     dataRecd: 00000000
-    data:
-      _dataUpdateType: 0
-      playerName: 
-      pos:
-        _posX: 0
-        _posY: 0
-        _posZ: 0
-      rot:
-        _rotX: 0
-        _rotY: 0
-        _rotZ: 0
+    dataToSend: 00000000
+    dataUpdateType: 0

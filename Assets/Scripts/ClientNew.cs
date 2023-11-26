@@ -1,11 +1,9 @@
 using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Serialization;
 using Random = UnityEngine.Random;
 
 public class ClientNew : MonoBehaviour
@@ -16,9 +14,11 @@ public class ClientNew : MonoBehaviour
     // private static readonly IPAddress ServerAddress = IPAddress.Parse("127.0.0.1");
     
     // is NULL till the client joins the server(client -> player)
-    public Player player;
+    public Player localPlayer;
 
     public ClientStatus clientStatus;
+    
+    public List<Player> playersConnected = new List<Player>();
     
     public enum ClientStatus
     {
@@ -28,7 +28,12 @@ public class ClientNew : MonoBehaviour
     }
     
     public float timeSinceLastSend;
-    
+
+    private void Awake()
+    {
+        DontDestroyOnLoad(this);
+    }
+
     // Start is called before the first frame update
     void Start()
     {
@@ -39,9 +44,53 @@ public class ClientNew : MonoBehaviour
         ConnectToServer();
     }
     
-    private Byte[] bytes = new Byte[4];
+    // private Byte[] bytes = new Byte[4];
     public Player ServerPlayer;
+    
+    // Update is called once per frame
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            localPlayer.dataUpdateType = DataUpdateType.Ready;
+            ReadyStatus readyStatus = (ReadyStatus)localPlayer.returnDataStruct;
+            readyStatus.ready = true;
+            localPlayer.dataToSend = localPlayer.ObjectToByteArray(readyStatus);
+            SendData.Send(localPlayer, localPlayer.dataToSend, SendData.SendType.ReplyOne);
+        }
+        
+        float horizontalAxis = Input.GetAxis("Horizontal");
+        if (horizontalAxis != 0)
+        {
+            transform.position += new Vector3(horizontalAxis, 0, 0);
 
+            if (timeSinceLastSend > 0.5f)
+            {
+                localPlayer.dataUpdateType = DataUpdateType.Transform;
+                
+                TransformData transformData = (TransformData)localPlayer.returnDataStruct;
+                transformData.pos = new TransformData.Pos
+                {
+                    _posX = transform.position.x,
+                    _posY = transform.position.y,
+                    _posZ = transform.position.z
+                };
+
+                
+                localPlayer.dataToSend = localPlayer.ObjectToByteArray(transformData); 
+                print($"{localPlayer.dataToSend.Length} {localPlayer.dataUpdateType}");
+                // print(bytes.Length);
+
+                // Send(sizeOfMsg, bytes);
+                SendData.Send(localPlayer, localPlayer.dataToSend, SendData.SendType.ReplyOne);
+                // _clientSocket.BeginSend()
+                timeSinceLastSend = 0;
+            }
+        }
+        
+        timeSinceLastSend += Time.deltaTime;
+    }
+    
     private async void ConnectToServer()
     {
         // IPHostEntry ipHostInfo = Dns.Resolve(Dns.GetHostName());
@@ -58,7 +107,7 @@ public class ClientNew : MonoBehaviour
             clientStatus = ClientStatus.Connecting;
             
             Debug.Log("NEW PLAYER CREATED");
-            player = new Player
+            localPlayer = new Player
             {
                 dataUpdateType = DataUpdateType.Joining,
                 // data = new Data
@@ -68,29 +117,39 @@ public class ClientNew : MonoBehaviour
             };
                 
             // player.playerName = player.data.playerName;
-            JoiningData joiningData = (JoiningData)player.returnDataStruct;
+            JoiningData joiningData = (JoiningData)localPlayer.returnDataStruct;
             joiningData.playerName = Random.Range(0, 100).ToString();
-            player.playerName = joiningData.playerName;
+            int randomID = Random.Range(1000, 9999);
+            joiningData.playerID = randomID;
+            // gameObject.name = joiningData.playerName;
+            localPlayer.playerName = joiningData.playerName;
+            // ServerPlayer.playerName = joiningData.playerName;
+            // playersConnected.Add(localPlayer);
+            localPlayer.workSocket = _clientSocket;
             // print(joiningData.playerName);
 
-            bytes = player.ObjectToByteArray(joiningData);
+            ServerPlayer.dataToSend = localPlayer.ObjectToByteArray(joiningData);
             // bytes = ObjectToByteArray(player.data);
             byte[] sizeOfMsg = new byte[sizeof(int)];
-            sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(bytes.Length.ToString() + (int)player.dataUpdateType);
-            print(bytes.Length.ToString() + (int)player.dataUpdateType);
+            sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(ServerPlayer.dataToSend.Length.ToString() + (int)localPlayer.dataUpdateType);
+            print($"{ServerPlayer.dataToSend.Length} {localPlayer.dataUpdateType}");
 
-            try
-            {
-                await _clientSocket.SendAsync(sizeOfMsg, 0);
-                await _clientSocket.SendAsync(bytes, 0);
-            }
-            catch (Exception e)
-            {
-                print(e);
-                throw;
-            }
+            // Send(sizeOfMsg, bytes);
+            await SendData.Send(localPlayer, ServerPlayer.dataToSend, SendData.SendType.ReplyOne);
+            ServerPlayer.dataToSend = new byte[sizeof(int)];
 
-            ServerPlayer = new Player();
+            // try
+            // {
+            //     await _clientSocket.SendAsync(sizeOfMsg, 0);
+            //     await _clientSocket.SendAsync(bytes, 0);
+            // }
+            // catch (Exception e)
+            // {
+            //     print(e);
+            //     throw;
+            // }
+
+            // ServerPlayer = new Player();
             _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 4, 0, 
                 new AsyncCallback(CheckForDataLength), ServerPlayer);
         }
@@ -99,57 +158,6 @@ public class ClientNew : MonoBehaviour
             print(e);
             throw;
         }
-    }
-    
-    // Update is called once per frame
-    void Update()
-    {
-        float horizontalAxis = Input.GetAxis("Horizontal");
-        if (horizontalAxis != 0)
-        {
-            transform.position += new Vector3(horizontalAxis, 0, 0);
-
-            if (timeSinceLastSend > 0.3f)
-            {
-                player.dataUpdateType = DataUpdateType.Transform;
-                // player.data = new Data
-                // {
-                //     pos = new Data.Pos
-                //     {
-                //         _posX = transform.position.x,
-                //         _posY = transform.position.y,
-                //         _posZ = transform.position.z
-                //     }
-                // };
-                
-                TransformData transformData = (TransformData)player.returnDataStruct;
-                transformData.pos = new TransformData.Pos
-                {
-                    _posX = transform.position.x,
-                    _posY = transform.position.y,
-                    _posZ = transform.position.z
-                };
-
-                
-                bytes = player.ObjectToByteArray(transformData);
-                byte[] sizeOfMsg = new byte[sizeof(int)];
-                sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(bytes.Length.ToString() + (int)player.dataUpdateType);
-                print(bytes.Length.ToString() + (int)player.dataUpdateType);
-                // print(bytes.Length);
-
-                Send(sizeOfMsg, bytes);
-                // _clientSocket.BeginSend()
-                timeSinceLastSend = 0;
-            }
-        }
-        
-        timeSinceLastSend += Time.deltaTime;
-    }
-
-    private async void Send(byte[] sizeOfMsg, byte[] bytesToSend)
-    {
-        await _clientSocket.SendAsync(sizeOfMsg, 0);
-        await _clientSocket.SendAsync(bytesToSend, 0);
     }
 
     private void CheckForDataLength(IAsyncResult ar)
@@ -166,7 +174,7 @@ public class ClientNew : MonoBehaviour
             return;
         }
 
-        Debug.Log(bytesRead);
+        Debug.Log($"{bytesRead} Bytes Received");
         byte[] sizeVal = new byte[bytesRead - 1];
         byte[] updateType = new byte[1];
         updateType[0] = serverPlayer.dataRecd[bytesRead - 1];
@@ -197,23 +205,12 @@ public class ClientNew : MonoBehaviour
         
     }
 
+    // public static Action<Player, byte[]> HandleData;
+
     private void ReceiveData(IAsyncResult ar)
     {
         Player serverPlayer = (Player) ar.AsyncState;
         print(serverPlayer.dataRecd.Length);
-        
-        byte[] aa = serverPlayer.dataRecd;
-
-        // READS SOMETIMES AND FAILS OTHER TIMES
-        // Data data = ByteArrayToObject(serverPlayer.dataRecd);
-        //
-        // if (serverPlayer.dataUpdateType == DataUpdateType.Transform)
-        // {
-        //     print(data.pos._posX);
-        // }
-        //
-        // // serverPlayer.data = data;
-        // print(serverPlayer.dataUpdateType);
         
         int bytesRead = _clientSocket.EndReceive(ar);
         
@@ -231,124 +228,128 @@ public class ClientNew : MonoBehaviour
         }
 
         if (bytesRead > 0)
-        {
-            switch (serverPlayer.dataUpdateType)
-            {
-                case DataUpdateType.Joining:
-                    
-                    // state.playerName = data.playerName;
-                    // Debug.Log($"{state.playerName} CONNECTED!");
-                    JoiningData joiningData = (JoiningData)serverPlayer.ByteArrayToObject(aa);
-                    // if (state.playerName == null)
-                    {
-                        // Debug.Log("HAS JOINING DATA");
-                        // state.playerName = joiningData.playerName;
-                        Debug.Log($"{joiningData.playerName} CONNECTED!");
-                        // playersConnected.Add(state);
-                    }
+        { 
+            // GetComponent<HandleData>().Handle(serverPlayer, serverPlayer.dataRecd);
+            HandleDataPlayer(serverPlayer, serverPlayer.dataRecd);
+            // HandleData(serverPlayer, serverPlayer.dataRecd);
             
-                    break;
-                
-                case DataUpdateType.Transform:
-
-                    TransformData transformData = (TransformData)serverPlayer.ByteArrayToObject(aa);
-                    string content = $"{transformData.pos._posX}, {transformData.pos._posY}, {transformData.pos._posZ}";
-                    Debug.Log($"{serverPlayer.playerName} : {content}");
-                    
-                    break;
-            }
-            
-            // print($"{data.pos._posX}");
-            
-            // serverPlayer.dataRecd = new byte[sizeof(int)];
-            // _clientSocket.BeginReceive( serverPlayer.dataRecd, 0, sizeof(int), 0,
-            //     new AsyncCallback(CheckForDataLength), serverPlayer);
-            
-            ServerPlayer = new Player();
-            // ServerPlayer.dataRecd = new byte[sizeof(int)];
-            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 4, 0, 
-                new AsyncCallback(CheckForDataLength), ServerPlayer);
+            // serverPlayer = new Player();
+            serverPlayer.dataRecd = new byte[sizeof(int)];
+            _clientSocket.BeginReceive( serverPlayer.dataRecd, 0, 4, 0, 
+                new AsyncCallback(CheckForDataLength), serverPlayer);
         }
 
         // player.dataRecd = new byte[sizeof(int)];
     }
-
-    public byte[] ObjectToByteArray(Data obj)
-    {
-        // BinaryFormatter binaryFormatter = new BinaryFormatter();
-        // using (var ms = new MemoryStream())
-        // {
-        //     binaryFormatter.Serialize(ms, obj);
-        //     return ms.ToArray();
-        // }
-
-        try
-        {
-            // Create new BinaryFormatter
-            BinaryFormatter binaryFormatter = new BinaryFormatter();    
-            // Create target memory stream
-            using MemoryStream memoryStream = new MemoryStream();             
-            // Serialize object to stream
-            binaryFormatter.Serialize(memoryStream, obj);       
-            // Return stream as byte array
-            return memoryStream.ToArray();                              
-        }
-        catch (Exception e)
-        {
-            print(e);
-            throw;
-        }
-    }
     
-    private Data ByteArrayToObject(byte[] arrBytes)
+    private void HandleDataPlayer(Player state, byte[] data)
     {
-        // MemoryStream memStream = new MemoryStream();
-        // BinaryFormatter binForm = new BinaryFormatter();
-        // memStream.Write(arrBytes, 0, arrBytes.Length);
-        // memStream.Seek(0, SeekOrigin.Begin);
-        // Data obj = (Data) binForm.Deserialize(memStream);
-        // return obj;
-
-        // try
-        // {
-        //     BinaryFormatter bf = new BinaryFormatter();
-        //     using(MemoryStream ms = new MemoryStream(arrBytes))
-        //     {
-        //         Data obj = (Data) bf.Deserialize(ms);
-        //         return obj;
-        //     }
-        // }
-        // catch (Exception e)
-        // {
-        //     Console.WriteLine(e);
-        //     throw;
-        // }
-
-        try
+        switch (state.dataUpdateType)
         {
-            // Create new BinaryFormatter
-            BinaryFormatter binaryFormatter = new BinaryFormatter(); 
-            // Convert buffer to memorystream
-            using MemoryStream memoryStream = new MemoryStream(arrBytes);
-            memoryStream.Seek(0, SeekOrigin.Begin);
-            // Deserialize stream to an object
-            Data data = (Data) binaryFormatter.Deserialize(memoryStream);
-            return data;
+            case DataUpdateType.Ready:
+
+                ReadyStatus readyStatus = (ReadyStatus)state.ByteArrayToObject(data);
+                foreach (Player player in playersConnected)
+                {
+                    print($"{player.PlayerID} {readyStatus.ready}");
+                    if (player.PlayerID == readyStatus.playerID)
+                    {
+                        player.ready = readyStatus.ready;
+                    }
+                }
+                
+                break;
+                
+            case DataUpdateType.JoiningDataReply:
+
+                JoinLeaveData joinLeaveData = (JoinLeaveData)state.ByteArrayToObject(data);
+                // print(joiningDataReply.playersConnected);
+                
+                // playersConnected = new List<Player>();
+
+                // New player joined Server
+                if (playersConnected.Count <= joinLeaveData.playersConnected.Length)
+                {
+                    for (int i = 0; i < joinLeaveData.playersConnected.Length; i++)
+                    {
+                        if (i == 0)
+                        {
+                            localPlayer.PlayerID = joinLeaveData.playerIDs[i];
+                        }
+                        
+                        if (i < playersConnected.Count)
+                        {
+                            playersConnected[i].playerName = joinLeaveData.playersConnected[i];
+                            playersConnected[i].PlayerID = joinLeaveData.playerIDs[i];
+                            playersConnected[i].ready = joinLeaveData.ready[i];
+                        }
+                        else
+                        {
+                            Player player = new Player
+                            {
+                                playerName = joinLeaveData.playersConnected[i],
+                                PlayerID = joinLeaveData.playerIDs[i],
+                                ready = joinLeaveData.ready[i]
+                            };
+
+                            // print(player.PlayerID);
+                            playersConnected.Add(player);
+                            Debug.Log($"{player.playerName} CONNECTED!");
+                        }
+                    }
+                }
+                // Player left Server
+                else if (playersConnected.Count > joinLeaveData.playersConnected.Length)
+                {
+                    foreach (Player player in playersConnected)
+                    {
+                        bool stillConnected = false;
+                        foreach (int playerID in joinLeaveData.playerIDs)
+                        {
+                            if (player.PlayerID == playerID)
+                            {
+                                stillConnected = true;
+                                break;
+                            }
+
+                        }
+
+                        if (!stillConnected)
+                        {
+                            playersConnected.Remove(player);
+                            break;
+                        }
+                    }
+                }
+                
+                break;
+            
+            case DataUpdateType.Transform:
+
+                TransformData transformData = (TransformData)state.ByteArrayToObject(data);
+                string content = $"{transformData.pos._posX}, {transformData.pos._posY}, {transformData.pos._posZ}";
+
+                foreach (Player player in playersConnected)
+                {
+                    if (player.PlayerID == transformData.playerID)
+                    {
+                        Debug.Log($"{player.playerName} : {content}");
+                    }
+                }
+                
+                break;
         }
-        catch (Exception e)
-        {
-            print(e);
-            throw;
-        }
-    }
-    
-    private void SendJoiningData(IAsyncResult ar)
-    {
-        
     }
     
     private void OnApplicationQuit()
     {
-        _clientSocket.Close();
+        try
+        {
+            _clientSocket.Shutdown(SocketShutdown.Both);
+        }
+        finally
+        {
+            _clientSocket.Close();
+        }
     }
 }

@@ -9,7 +9,14 @@ public class ExternServer : MonoBehaviour
 
     public static List<Player> ConnectedPlayers = new();
     public List<Player> CONNECTIONS = new();
-    
+    // public static HandleData HandleData;
+
+    private void Awake()
+    {
+        DontDestroyOnLoad(this);
+        // HandleData = GetComponent<HandleData>();
+    }
+
     // Start is called before the first frame update
     void Start()
     {
