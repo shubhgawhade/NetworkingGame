@@ -93,7 +93,7 @@ public class AsynchronousSocketListener
         bytesRead = handler.Receive(state.dataRecd, 0);
         if (bytesRead == 0)
         {
-            QuitClient(handler, state);
+            QuitClient(handler, state, 1);
             return;
         }
         
@@ -134,7 +134,7 @@ public class AsynchronousSocketListener
 
         if (bytesRead == 0)
         {
-            QuitClient(handler, state);
+            QuitClient(handler, state, 1);
             return;
         }
         
@@ -148,7 +148,7 @@ public class AsynchronousSocketListener
         }
     }
 
-    public static Action<object, DataUpdateType> ProcessDataServer;
+    public static Action<Player, object, DataUpdateType> ProcessDataServer;
     
     private void HandleDataServer(Player state, byte[] data)
     {
@@ -160,9 +160,9 @@ public class AsynchronousSocketListener
                 if (state.playerName == null)
                 {
                     // Debug.Log("HAS JOINING DATA");
-                    state.playerName = joiningData.playerName;
-                    state.PlayerID = joiningData.playerID;
-                    Debug.Log($"{state.playerName} CONNECTED!");
+                    // state.playerName = joiningData.playerName;
+                    // state.PlayerID = joiningData.playerID;
+                    // Debug.Log($"{state.playerName} CONNECTED!");
 
                     for (int i = 0; i < playersConnected.Count; i++)
                     {
@@ -172,26 +172,9 @@ public class AsynchronousSocketListener
                             // state.PlayerID = 1;
                         }
                     }
-                    // ProcessDataServer(joiningData, state.dataUpdateType);
+                    ProcessDataServer(state, joiningData, state.dataUpdateType);
                     
                     // SendData.Send(state, state.dataRecd, SendData.SendType.ReplyAllButSender);
-                    
-                    state.dataUpdateType = DataUpdateType.JoiningDataReply;
-                    JoinLeaveData joinLeaveData = (JoinLeaveData) state.returnDataStruct;
-                    joinLeaveData.playersConnected = new string[playersConnected.Count];
-                    joinLeaveData.playerIDs = new int[playersConnected.Count];
-                    joinLeaveData.ready = new bool[playersConnected.Count];
-                    for (int i = 0; i < playersConnected.Count; i++)
-                    {
-                        joinLeaveData.playersConnected[i] = playersConnected[i].playerName;
-                        joinLeaveData.playerIDs[i] = playersConnected[i].PlayerID;
-                        joinLeaveData.ready[i] = playersConnected[i].ready;
-                    }
-                    // joiningDataReply.playersConnected = "AA";
-                    state.dataToSend = state.ObjectToByteArray(joinLeaveData);
-                    Debug.Log($"{state.dataToSend.Length} {state.dataUpdateType}");
-                    SendData.Send(state, state.dataToSend, SendData.SendType.ReplyAll);
-
                 }
             
                 break;
@@ -213,7 +196,7 @@ public class AsynchronousSocketListener
                         if(!player.ready) return;
                     }
                     
-                    ProcessDataServer(readyStatus, DataUpdateType.Ready);
+                    ProcessDataServer(state, readyStatus, DataUpdateType.Ready);
                 }
                 
                 break;
@@ -232,13 +215,8 @@ public class AsynchronousSocketListener
         }
     }
     
-    private void QuitClient(Socket handler, Player state)
+    public void QuitClient(Socket handler, Player state, int errorCode)
     {
-        handler.Shutdown(SocketShutdown.Both);
-        handler.Close();
-        Debug.Log($"{state.playerName} DISCONNECTED!");
-        playersConnected.Remove(state);
-        
         state.dataUpdateType = DataUpdateType.JoiningDataReply;
         JoinLeaveData joinLeaveData = (JoinLeaveData) state.returnDataStruct;
         joinLeaveData.playersConnected = new string[playersConnected.Count];
@@ -248,10 +226,21 @@ public class AsynchronousSocketListener
             joinLeaveData.playersConnected[i] = playersConnected[i].playerName;
             joinLeaveData.playerIDs[i] = playersConnected[i].PlayerID;
         }
+
+        joinLeaveData.errorCode = errorCode;
+        Debug.LogWarning($"ERROR CODE : {joinLeaveData.errorCode}");
+        
+        ProcessDataServer(state, joinLeaveData, DataUpdateType.JoiningDataReply);
         
         state.dataToSend = state.ObjectToByteArray(joinLeaveData);
+        
         Debug.Log($"{state.dataToSend.Length} {state.dataUpdateType}");
         SendData.Send(state, state.dataToSend, SendData.SendType.ReplyAll);
+
+        handler.Shutdown(SocketShutdown.Both);
+        handler.Close();
+        Debug.Log($"{state.playerName} DISCONNECTED!");
+        playersConnected.Remove(state);
     }
 
     private void ShutDownServer()
@@ -280,7 +269,7 @@ public class AsynchronousSocketListener
         // }
     }
     
-    static AsynchronousSocketListener asynchronousSocketListener = new AsynchronousSocketListener();
+    public static readonly AsynchronousSocketListener asynchronousSocketListener = new AsynchronousSocketListener();
 
     public static void SD()
     {

@@ -12,16 +12,19 @@ public class ClientNew : MonoBehaviour
     static readonly Int32 Port = 7777;
     private static readonly IPAddress ServerAddress = IPAddress.Parse("192.168.0.118");
     // private static readonly IPAddress ServerAddress = IPAddress.Parse("127.0.0.1");
+
+    public static Action<int> ClientStatusAction;
     
     // is NULL till the client joins the server(client -> player)
     public Player localPlayer;
 
-    public ClientStatus clientStatus;
+    public ClientStatus clientStatus = ClientStatus.Offline;
     
     public List<Player> playersConnected = new List<Player>();
     
     public enum ClientStatus
     {
+        Offline,
         Connecting,
         Connected,
         Disconnected
@@ -41,7 +44,7 @@ public class ClientNew : MonoBehaviour
         _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );
         
         // Call from a connect button
-        ConnectToServer();
+        // ConnectToServer();
     }
     
     // private Byte[] bytes = new Byte[4];
@@ -91,7 +94,7 @@ public class ClientNew : MonoBehaviour
         timeSinceLastSend += Time.deltaTime;
     }
     
-    private async void ConnectToServer()
+    public async void ConnectToServer(string serverAddress, string playerName)
     {
         // IPHostEntry ipHostInfo = Dns.Resolve(Dns.GetHostName());
         // IPAddress ipAddress = ipHostInfo.AddressList[1];
@@ -100,11 +103,12 @@ public class ClientNew : MonoBehaviour
         // Create the connection endpoint and connect
         try
         {
-            IPEndPoint localEndPoint = new IPEndPoint(ServerAddress, Port);
+            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Parse(serverAddress), Port);
             await _clientSocket.ConnectAsync(localEndPoint);
             
             // Set the client status to be connected
             clientStatus = ClientStatus.Connecting;
+            ClientStatusAction((int)clientStatus);
             
             Debug.Log("NEW PLAYER CREATED");
             localPlayer = new Player
@@ -118,9 +122,10 @@ public class ClientNew : MonoBehaviour
                 
             // player.playerName = player.data.playerName;
             JoiningData joiningData = (JoiningData)localPlayer.returnDataStruct;
-            joiningData.playerName = Random.Range(0, 100).ToString();
-            int randomID = Random.Range(1000, 9999);
-            joiningData.playerID = randomID;
+            // joiningData.playerName = Random.Range(0, 100).ToString();
+            joiningData.playerName = playerName;
+            // int randomID = Random.Range(1000, 9999);
+            // joiningData.playerID = randomID;
             // gameObject.name = joiningData.playerName;
             localPlayer.playerName = joiningData.playerName;
             // ServerPlayer.playerName = joiningData.playerName;
@@ -155,6 +160,7 @@ public class ClientNew : MonoBehaviour
         }
         catch (Exception e)
         {
+            ClientStatusAction((int)clientStatus);
             print(e);
             throw;
         }
@@ -168,8 +174,10 @@ public class ClientNew : MonoBehaviour
 
         if (bytesRead == 0)
         {
-            print("DISCONNECTED");
-            _clientSocket.Close();
+            Disconnect(2);
+            
+            // print("DISCONNECTED");
+            // _clientSocket.Close();
             // QuitClient(handler, state);
             return;
         }
@@ -221,8 +229,10 @@ public class ClientNew : MonoBehaviour
 
         if (bytesRead == 0)
         {
-            print("DISCONNECTED");
-            _clientSocket.Close();
+            Disconnect(2);
+            
+            // print("DISCONNECTED");
+            // _clientSocket.Close();
             // QuitClient(handler, state);
             return;
         }
@@ -267,6 +277,12 @@ public class ClientNew : MonoBehaviour
                 
                 // playersConnected = new List<Player>();
 
+                if (joinLeaveData.errorCode == -1)
+                {
+                    print("SERVER HAS MAX PLAYERS");
+                    break;
+                }
+                
                 // New player joined Server
                 if (playersConnected.Count <= joinLeaveData.playersConnected.Length)
                 {
@@ -339,6 +355,18 @@ public class ClientNew : MonoBehaviour
                 
                 break;
         }
+    }
+
+    public void Disconnect(int errorCode)
+    {
+        _clientSocket.Shutdown(SocketShutdown.Both);
+        _clientSocket.Close();
+        
+        Debug.LogWarning($"ERROR CODE : {errorCode}");
+        print("SERVER CLOSED CONNECTION");
+        
+        clientStatus = ClientStatus.Disconnected;
+        ClientStatusAction((int) clientStatus);
     }
     
     private void OnApplicationQuit()

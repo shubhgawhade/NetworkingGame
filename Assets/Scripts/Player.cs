@@ -179,6 +179,14 @@ public class JoiningData : PlayerID
 [Serializable]
 public class JoinLeaveData
 {
+    public int errorCode;
+    // CODES
+    // -1 : MAX PLAYERS
+    // 0 : DISCONNECTED NORMALLY
+    // 1 : SERVER - PLAYER CLOSED CONNECTION
+    // 2 : PLAYER - SERVER CLOSED CONNECTION
+    
+    
     public string[] playersConnected;
     public int[] playerIDs;
     public bool[] ready;
