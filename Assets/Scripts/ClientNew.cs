@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Serialization;
 using Random = UnityEngine.Random;
 
 public class ClientNew : MonoBehaviour
@@ -13,14 +14,18 @@ public class ClientNew : MonoBehaviour
     private static readonly IPAddress ServerAddress = IPAddress.Parse("192.168.0.118");
     // private static readonly IPAddress ServerAddress = IPAddress.Parse("127.0.0.1");
 
-    public static Action<int> ClientStatusAction;
-    
+    // public static Action<int> ClientStatusAction;
+    public GameState gameState = new GameState();
+
     // is NULL till the client joins the server(client -> player)
     public Player localPlayer;
 
     public ClientStatus clientStatus = ClientStatus.Offline;
     
     public List<Player> playersConnected = new List<Player>();
+    
+    [SerializeField] private GameObject playerPrefab;
+    public List<GameObject> objectsInScene = new List<GameObject>();
     
     public enum ClientStatus
     {
@@ -35,14 +40,13 @@ public class ClientNew : MonoBehaviour
     private void Awake()
     {
         DontDestroyOnLoad(this);
+
+        ClientGameManager.client = this;
     }
 
     // Start is called before the first frame update
     void Start()
     {
-        // Create TCP Socket
-        _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );
-        
         // Call from a connect button
         // ConnectToServer();
     }
@@ -62,40 +66,43 @@ public class ClientNew : MonoBehaviour
             SendData.Send(localPlayer, localPlayer.dataToSend, SendData.SendType.ReplyOne);
         }
         
-        float horizontalAxis = Input.GetAxis("Horizontal");
-        if (horizontalAxis != 0)
-        {
-            transform.position += new Vector3(horizontalAxis, 0, 0);
-
-            if (timeSinceLastSend > 0.5f)
-            {
-                localPlayer.dataUpdateType = DataUpdateType.Transform;
-                
-                TransformData transformData = (TransformData)localPlayer.returnDataStruct;
-                transformData.pos = new TransformData.Pos
-                {
-                    _posX = transform.position.x,
-                    _posY = transform.position.y,
-                    _posZ = transform.position.z
-                };
-
-                
-                localPlayer.dataToSend = localPlayer.ObjectToByteArray(transformData); 
-                print($"{localPlayer.dataToSend.Length} {localPlayer.dataUpdateType}");
-                // print(bytes.Length);
-
-                // Send(sizeOfMsg, bytes);
-                SendData.Send(localPlayer, localPlayer.dataToSend, SendData.SendType.ReplyOne);
-                // _clientSocket.BeginSend()
-                timeSinceLastSend = 0;
-            }
-        }
-        
-        timeSinceLastSend += Time.deltaTime;
+        // float horizontalAxis = Input.GetAxis("Horizontal");
+        // if (horizontalAxis != 0)
+        // {
+        //     transform.position += new Vector3(horizontalAxis, 0, 0);
+        //
+        //     if (timeSinceLastSend > 0.5f)
+        //     {
+        //         localPlayer.dataUpdateType = DataUpdateType.Transform;
+        //         
+        //         TransformData transformData = (TransformData)localPlayer.returnDataStruct;
+        //         transformData.pos = new Pos
+        //         {
+        //             _posX = transform.position.x,
+        //             _posY = transform.position.y,
+        //             _posZ = transform.position.z
+        //         };
+        //
+        //         
+        //         localPlayer.dataToSend = localPlayer.ObjectToByteArray(transformData); 
+        //         print($"{localPlayer.dataToSend.Length} {localPlayer.dataUpdateType}");
+        //         // print(bytes.Length);
+        //
+        //         // Send(sizeOfMsg, bytes);
+        //         SendData.Send(localPlayer, localPlayer.dataToSend, SendData.SendType.ReplyOne);
+        //         // _clientSocket.BeginSend()
+        //         timeSinceLastSend = 0;
+        //     }
+        // }
+        //
+        // timeSinceLastSend += Time.deltaTime;
     }
     
     public async void ConnectToServer(string serverAddress, string playerName)
     {
+        // Create TCP Socket
+        _clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );
+        
         // IPHostEntry ipHostInfo = Dns.Resolve(Dns.GetHostName());
         // IPAddress ipAddress = ipHostInfo.AddressList[1];
         // Debug.Log(IPAddress.Parse(ipAddress.ToString()));
@@ -108,7 +115,10 @@ public class ClientNew : MonoBehaviour
             
             // Set the client status to be connected
             clientStatus = ClientStatus.Connecting;
-            ClientStatusAction((int)clientStatus);
+            // ClientStatusAction((int)clientStatus);
+            
+            gameState.ChangeState(GameState.gameStateEnum.Lobby);
+
             
             Debug.Log("NEW PLAYER CREATED");
             localPlayer = new Player
@@ -160,7 +170,10 @@ public class ClientNew : MonoBehaviour
         }
         catch (Exception e)
         {
-            ClientStatusAction((int)clientStatus);
+            // ClientStatusAction((int)clientStatus);
+            
+            gameState.ChangeState(GameState.gameStateEnum.JoinScreen);
+            
             print(e);
             throw;
         }
@@ -244,16 +257,23 @@ public class ClientNew : MonoBehaviour
             // HandleData(serverPlayer, serverPlayer.dataRecd);
             
             // serverPlayer = new Player();
-            serverPlayer.dataRecd = new byte[sizeof(int)];
+            // if (!receivedData)
+            {
+                serverPlayer.dataRecd = new byte[sizeof(int)];
+            }
+            
             _clientSocket.BeginReceive( serverPlayer.dataRecd, 0, 4, 0, 
                 new AsyncCallback(CheckForDataLength), serverPlayer);
         }
 
         // player.dataRecd = new byte[sizeof(int)];
     }
-    
+
+    public bool receivedData;
     private void HandleDataPlayer(Player state, byte[] data)
     {
+        receivedData = true;
+        
         switch (state.dataUpdateType)
         {
             case DataUpdateType.Ready:
@@ -288,9 +308,10 @@ public class ClientNew : MonoBehaviour
                 {
                     for (int i = 0; i < joinLeaveData.playersConnected.Length; i++)
                     {
-                        if (i == 0)
+                        if (playersConnected.Count == 0)
                         {
-                            localPlayer.PlayerID = joinLeaveData.playerIDs[i];
+                            print(joinLeaveData.playerIDs[i]);
+                            localPlayer.PlayerID = joinLeaveData.playerIDs[joinLeaveData.playersConnected.Length - 1];
                         }
                         
                         if (i < playersConnected.Count)
@@ -340,8 +361,37 @@ public class ClientNew : MonoBehaviour
                 
                 break;
             
+            case DataUpdateType.OwnedObject:
+
+                gameState.ChangeState(GameState.gameStateEnum.Game);
+                
+                localPlayer.dataRecd = data;
+                OwnedObject ownedObject = (OwnedObject)state.ByteArrayToObject(data);
+                print(ownedObject.objectType);
+
+                if (localPlayer.PlayerID == ownedObject.playerID)
+                {
+                    localPlayer.playerOwnedObjects.Add(ownedObject);
+                }
+
+
+                // switch ((ObjectType)ownedObject.objectType)
+                // {
+                //     case ObjectType.Player:
+                //         
+                //         GameObject temp = Instantiate(playerPrefab, new Vector3(2, 0, 0), Quaternion.identity);
+                //         playerObjects.Add(temp);
+                //         
+                //         break;
+                //     
+                //     // case ObjectType.Bullet
+                // }
+                
+                break;
+            
             case DataUpdateType.Transform:
 
+                localPlayer.dataRecd = data;
                 TransformData transformData = (TransformData)state.ByteArrayToObject(data);
                 string content = $"{transformData.pos._posX}, {transformData.pos._posY}, {transformData.pos._posZ}";
 
@@ -359,14 +409,18 @@ public class ClientNew : MonoBehaviour
 
     public void Disconnect(int errorCode)
     {
-        _clientSocket.Shutdown(SocketShutdown.Both);
+        // _clientSocket.Shutdown(SocketShutdown.Both);
         _clientSocket.Close();
         
         Debug.LogWarning($"ERROR CODE : {errorCode}");
         print("SERVER CLOSED CONNECTION");
         
         clientStatus = ClientStatus.Disconnected;
-        ClientStatusAction((int) clientStatus);
+        playersConnected = new List<Player>();
+        // ClientStatusAction((int) clientStatus);
+        
+        gameState.ChangeState(GameState.gameStateEnum.JoinScreen);
+        
     }
     
     private void OnApplicationQuit()

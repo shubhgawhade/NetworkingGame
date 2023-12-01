@@ -26,6 +26,8 @@ public enum DataUpdateType
     Joining,
     JoiningDataReply,
     Ready,
+    StartGame,
+    OwnedObject,
     Transform,
     Heath
 }
@@ -40,6 +42,8 @@ public class Player
     public int PlayerID;
 
     public bool ready;
+
+    public List<OwnedObject> playerOwnedObjects = new List<OwnedObject>();
     
     // Receive and Send buffers
     public byte[] dataRecd = new byte[sizeof(int)];
@@ -73,6 +77,20 @@ public class Player
                 ReadyStatus rs = new ReadyStatus();
                 return rs;
                 
+                break;
+            
+            case DataUpdateType.OwnedObject:
+
+                OwnedObject oo = new OwnedObject();
+                return oo;
+                
+                break;
+            
+            case DataUpdateType.StartGame:
+
+                StartGameData sgd = new StartGameData();
+                return sgd;
+                    
                 break;
             
             case DataUpdateType.Transform:
@@ -146,6 +164,20 @@ public class Player
                     
                     break;
                 
+                case DataUpdateType.OwnedObject:
+
+                    OwnedObject ownedObject = (OwnedObject) binaryFormatter.Deserialize(memoryStream);
+                    return ownedObject;
+                    
+                    break;
+                
+                case DataUpdateType.StartGame:
+                    
+                    StartGameData startGameData = (StartGameData) binaryFormatter.Deserialize(memoryStream);
+                    return startGameData;
+                    
+                    break;
+                
                 case DataUpdateType.Transform:
 
                     TransformData transformData = (TransformData) binaryFormatter.Deserialize(memoryStream);
@@ -199,16 +231,35 @@ public class ReadyStatus : PlayerID
 }
 
 [Serializable]
+public enum ObjectType
+{
+    Player,
+    Bullet
+}
+
+[Serializable]
+public class OwnedObject : PlayerID
+{
+    public int objectType;
+    public Pos startPos;
+}
+
+public class StartGameData : PlayerID
+{
+    
+}
+
+[Serializable]
+public class Pos
+{
+    public float _posX;
+    public float _posY;
+    public float _posZ;
+}
+
+[Serializable]
 public class TransformData : PlayerID
 {
-    [Serializable]
-    public class Pos
-    {
-        public float _posX;
-        public float _posY;
-        public float _posZ;
-    }
-
     public Pos pos;
     
     [Serializable]

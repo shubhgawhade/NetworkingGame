@@ -1,5 +1,7 @@
+using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Random = UnityEngine.Random;
 
 public class JoinLobbyUI : MonoBehaviour
@@ -17,11 +19,16 @@ public class JoinLobbyUI : MonoBehaviour
 
     private void Awake()
     {
-        ClientNew.ClientStatusAction += UIStatus;
-        
         nameInput.text = Random.Range(1000, 9999).ToString();
         _playerName = nameInput.text;
         _ipAddress = ipAddressInput.text;
+
+        // joinLobbyCanvas = transform.GetChild(0).gameObject;
+    }
+
+    private void Start()
+    {
+        // ClientNew.ClientStatusAction += UIStatus;
     }
 
     public void OnConnectButtonPressed()
@@ -38,38 +45,40 @@ public class JoinLobbyUI : MonoBehaviour
     {
         _ipAddress = ipAddressInput.text;
     }
-
-    void UIStatus(int clientStatus)
+    
+    private void Update()
     {
-        print($"CLIENT STATUS : {clientStatus}");
-        switch (clientStatus)
+        if (clientConnectionObject.gameState.stateChanged)
         {
-            case 0:
+            clientConnectionObject.gameState.stateChanged = false;
+            
+            switch (clientConnectionObject.gameState.gameState)
+            {
+                case GameState.gameStateEnum.JoinScreen:
+                    
+                    joinLobbyCanvas.SetActive(true);
+                    lobbyCanvas.SetActive(false);
+                    
+                    break;
+                
+                case GameState.gameStateEnum.Lobby:
+                    
+                    lobbyCanvas.SetActive(true);
+                    joinLobbyCanvas.SetActive(false);
+                    
+                    break;
+                
+                case GameState.gameStateEnum.Game:
 
-                joinLobbyCanvas.SetActive(true);
-                lobbyCanvas.SetActive(false);
-                
-                break;
-            
-            case 1:
-                
-                lobbyCanvas.SetActive(true);
-                joinLobbyCanvas.SetActive(false);
-                
-                break;
-            
-            case 3:
-                
-                print("33333");
-                joinLobbyCanvas.SetActive(true);
-                lobbyCanvas.SetActive(false);
-                
-                break;
+                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
+                    
+                    break;
+            }
         }
     }
 
     private void OnApplicationQuit()
     {
-        ClientNew.ClientStatusAction -= UIStatus;
+        // ClientNew.ClientStatusAction -= UIStatus;
     }
 }

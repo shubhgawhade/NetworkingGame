@@ -189,7 +189,7 @@ public class AsynchronousSocketListener
                 state.dataToSend = state.ObjectToByteArray(readyStatus);
                 SendData.Send(state, state.dataToSend, SendData.SendType.ReplyAll);
 
-                if (playersConnected.Count > 1)
+                // if (playersConnected.Count > 1)
                 {
                     foreach (Player player in playersConnected)
                     {
@@ -217,6 +217,8 @@ public class AsynchronousSocketListener
     
     public void QuitClient(Socket handler, Player state, int errorCode)
     {
+        playersConnected.Remove(state);
+
         state.dataUpdateType = DataUpdateType.JoiningDataReply;
         JoinLeaveData joinLeaveData = (JoinLeaveData) state.returnDataStruct;
         joinLeaveData.playersConnected = new string[playersConnected.Count];
@@ -240,7 +242,6 @@ public class AsynchronousSocketListener
         handler.Shutdown(SocketShutdown.Both);
         handler.Close();
         Debug.Log($"{state.playerName} DISCONNECTED!");
-        playersConnected.Remove(state);
     }
 
     private void ShutDownServer()

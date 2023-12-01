@@ -6,11 +6,14 @@ public class HandleDataServer : MonoBehaviour
 {
     private AsynchronousSocketListener server;
     
-    public const int MaxPlayers = 2;
+    public const int MaxPlayers = 4;
     
     public List<int> _playerIDs = new List<int>();
     // private int[] playerIDs = { 1, 2, 3, 4 };
 
+
+    public GameState gameState = new GameState();
+    
     private void Awake()
     {
         server = AsynchronousSocketListener.asynchronousSocketListener;
@@ -84,7 +87,18 @@ public class HandleDataServer : MonoBehaviour
                 ReadyStatus readyStatus = (ReadyStatus) data;
                 if (readyStatus.ready)
                 {
+
+                    // SceneManager.LoadScene(1);
                     print("Start Game");
+
+                    gameState.ChangeState(GameState.gameStateEnum.Game);
+
+                    // SpawnPlayers();
+
+                    // state.dataUpdateType = DataUpdateType.StartGame;
+                    // StartGameData startGameData = (StartGameData)state.returnDataStruct;
+                    // startGameData.playerID = state.PlayerID;
+
                 }
                 
                 break;

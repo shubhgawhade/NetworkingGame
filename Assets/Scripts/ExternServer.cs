@@ -13,7 +13,7 @@ public class ExternServer : MonoBehaviour
 
     private void Awake()
     {
-        DontDestroyOnLoad(this);
+        DontDestroyOnLoad(gameObject);
         // HandleData = GetComponent<HandleData>();
     }
 
