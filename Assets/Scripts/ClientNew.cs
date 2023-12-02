@@ -253,8 +253,21 @@ public class ClientNew : MonoBehaviour
         if (bytesRead > 0)
         { 
             // GetComponent<HandleData>().Handle(serverPlayer, serverPlayer.dataRecd);
-            HandleDataPlayer(serverPlayer, serverPlayer.dataRecd);
+            // HandleDataPlayer(serverPlayer, serverPlayer.dataRecd);
             // HandleData(serverPlayer, serverPlayer.dataRecd);
+
+            object deserialized = (object)serverPlayer.ByteArrayToObject(serverPlayer.dataRecd);
+
+            DataToHandle dataToHandle = new DataToHandle
+            {
+                dataUpdateType = serverPlayer.dataUpdateType,
+                deserializedData = deserialized
+            };
+            
+            receivedDataToHandle.Add(dataToHandle);
+
+            
+            // AddToTaskList();
             
             // serverPlayer = new Player();
             // if (!receivedData)
@@ -269,10 +282,24 @@ public class ClientNew : MonoBehaviour
         // player.dataRecd = new byte[sizeof(int)];
     }
 
-    public bool receivedData;
+    [Serializable]
+    public class DataToHandle
+    {
+        public DataUpdateType dataUpdateType;
+        public object deserializedData;
+
+    }
+    
+    public List<DataToHandle> receivedDataToHandle;
+
+    public void AddToTaskList()
+    {
+    }
+    
+    // public bool receivedData;
     private void HandleDataPlayer(Player state, byte[] data)
     {
-        receivedData = true;
+        // receivedData = true;
         
         switch (state.dataUpdateType)
         {
@@ -281,12 +308,14 @@ public class ClientNew : MonoBehaviour
                 ReadyStatus readyStatus = (ReadyStatus)state.ByteArrayToObject(data);
                 foreach (Player player in playersConnected)
                 {
-                    print($"{player.PlayerID} {readyStatus.ready}");
                     if (player.PlayerID == readyStatus.playerID)
                     {
                         player.ready = readyStatus.ready;
+                        break;
                     }
                 }
+                
+                print($"{readyStatus.playerID} {readyStatus.ready}");
                 
                 break;
                 
