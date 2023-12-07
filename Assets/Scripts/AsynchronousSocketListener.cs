@@ -13,7 +13,9 @@ public class AsynchronousSocketListener
     private Player serverPlayer;
     private Socket listener;
 
-    private List<Player> playersConnected = new List<Player>();
+    public List<Player> playersConnected = new List<Player>();
+    
+    public List<DataToHandle> receivedDataToHandle = new List<DataToHandle>();
     
     // Thread signal.
     public static ManualResetEvent allDone = new ManualResetEvent(false);
@@ -140,7 +142,17 @@ public class AsynchronousSocketListener
         
         if (bytesRead > 0)
         {
-            HandleDataServer(state, state.dataRecd);
+            // HandleDataServer(state, state.dataRecd);
+            
+            object deserialized = (object) state.ByteArrayToObject(state.dataRecd);
+            DataToHandle dataToHandle = new DataToHandle
+            {
+                player = state,
+                dataUpdateType = state.dataUpdateType,
+                deserializedData = deserialized
+            };
+            
+            receivedDataToHandle.Add(dataToHandle);
             
             state.dataRecd = new byte[sizeof(int)];
             handler.BeginReceive(state.dataRecd, 0, 0, 0, 
@@ -148,7 +160,7 @@ public class AsynchronousSocketListener
         }
     }
 
-    public static Action<Player, object, DataUpdateType> ProcessDataServer;
+    // public static Action<Player, object, DataUpdateType> ProcessDataServer;
     
     private void HandleDataServer(Player state, byte[] data)
     {
@@ -172,7 +184,7 @@ public class AsynchronousSocketListener
                             // state.PlayerID = 1;
                         }
                     }
-                    ProcessDataServer(state, joiningData, state.dataUpdateType);
+                    // ProcessDataServer(state, joiningData, state.dataUpdateType);
                     
                     // SendData.Send(state, state.dataRecd, SendData.SendType.ReplyAllButSender);
                 }
@@ -196,7 +208,7 @@ public class AsynchronousSocketListener
                         if(!player.ready) return;
                     }
                     
-                    ProcessDataServer(state, readyStatus, DataUpdateType.Ready);
+                    // ProcessDataServer(state, readyStatus, DataUpdateType.Ready);
                 }
                 
                 break;
@@ -232,7 +244,16 @@ public class AsynchronousSocketListener
         joinLeaveData.errorCode = errorCode;
         Debug.LogWarning($"ERROR CODE : {joinLeaveData.errorCode}");
         
-        ProcessDataServer(state, joinLeaveData, DataUpdateType.JoiningDataReply);
+        // ProcessDataServer(state, joinLeaveData, DataUpdateType.JoiningDataReply);
+
+        DataToHandle dataToHandle = new DataToHandle
+        {
+            player = state,
+            dataUpdateType = state.dataUpdateType,
+            deserializedData = joinLeaveData
+        };
+            
+        receivedDataToHandle.Add(dataToHandle);
         
         state.dataToSend = state.ObjectToByteArray(joinLeaveData);
         

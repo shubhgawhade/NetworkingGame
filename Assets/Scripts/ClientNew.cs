@@ -24,7 +24,6 @@ public class ClientNew : MonoBehaviour
     
     public List<Player> playersConnected = new List<Player>();
     
-    [SerializeField] private GameObject playerPrefab;
     public List<GameObject> objectsInScene = new List<GameObject>();
     
     public enum ClientStatus
@@ -256,7 +255,7 @@ public class ClientNew : MonoBehaviour
             // HandleDataPlayer(serverPlayer, serverPlayer.dataRecd);
             // HandleData(serverPlayer, serverPlayer.dataRecd);
 
-            object deserialized = (object)serverPlayer.ByteArrayToObject(serverPlayer.dataRecd);
+            object deserialized = (object) serverPlayer.ByteArrayToObject(serverPlayer.dataRecd);
 
             DataToHandle dataToHandle = new DataToHandle
             {
@@ -281,16 +280,8 @@ public class ClientNew : MonoBehaviour
 
         // player.dataRecd = new byte[sizeof(int)];
     }
-
-    [Serializable]
-    public class DataToHandle
-    {
-        public DataUpdateType dataUpdateType;
-        public object deserializedData;
-
-    }
     
-    public List<DataToHandle> receivedDataToHandle;
+    public List<DataToHandle> receivedDataToHandle = new List<DataToHandle>();
 
     public void AddToTaskList()
     {
@@ -454,13 +445,16 @@ public class ClientNew : MonoBehaviour
     
     private void OnApplicationQuit()
     {
-        try
+        if (_clientSocket is { Connected: true })
         {
-            _clientSocket.Shutdown(SocketShutdown.Both);
-        }
-        finally
-        {
-            _clientSocket.Close();
+            try
+            {
+                _clientSocket.Shutdown(SocketShutdown.Both);
+            }
+            finally
+            {
+                _clientSocket.Close();
+            }
         }
     }
 }

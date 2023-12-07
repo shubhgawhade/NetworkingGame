@@ -23,20 +23,20 @@ public class ProcessDataClient : MonoBehaviour
     {
         if (client.receivedDataToHandle.Count > 0)
         {
-            ClientNew.DataToHandle data = client.receivedDataToHandle[0];
+            DataToHandle data = client.receivedDataToHandle[0];
             
             switch (client.receivedDataToHandle[0].dataUpdateType)
-            { 
+            {
                 case DataUpdateType.Ready:
 
                     ReadyStatus readyStatus = (ReadyStatus) data.deserializedData;
                     foreach (Player player in client.playersConnected)
                     {
-                        print($"{player.PlayerID} {readyStatus.ready}");
                         if (player.PlayerID == readyStatus.playerID)
                         {
                             player.ready = readyStatus.ready;
                         }
+                        print($"{player.PlayerID} {player.ready}");
                     }
                 
                     break;
@@ -100,6 +100,15 @@ public class ProcessDataClient : MonoBehaviour
 
                             if (!stillConnected)
                             {
+                                foreach (GameObject obj in client.objectsInScene)
+                                {
+                                    if (obj.GetComponent<OnlinePlayerController>().id == player.PlayerID)
+                                    {
+                                        Destroy(obj);
+                                        client.objectsInScene.Remove(obj);
+                                        break;
+                                    }
+                                }
                                 client.playersConnected.Remove(player);
                                 break;
                             }
@@ -119,24 +128,38 @@ public class ProcessDataClient : MonoBehaviour
                     {
                         case ObjectType.Player:
 
-                            Vector3 tempPos = new Vector3(ownedObject.startPos._posX, ownedObject.startPos._posY,
-                                ownedObject.startPos._posZ);
-                            
-                            GameObject temp = Instantiate(playerPrefab, tempPos, Quaternion.identity);
-                            client.objectsInScene.Add(temp);
+                            bool exists = false;
+                            foreach (OwnedObject localPlayerPlayerOwnedObject in client.localPlayer.playerOwnedObjects)
+                            {
+                                if (localPlayerPlayerOwnedObject.playerID == ownedObject.playerID)
+                                {
+                                    exists = true;
+                                }
+                            }
 
-                                    
-                            temp.GetComponent<OnlinePlayerController>().id = ownedObject.playerID;
+                            if (!exists)
+                            {
+                                Vector3 tempPos = new Vector3(ownedObject.startPos._posX, ownedObject.startPos._posY,
+                                    ownedObject.startPos._posZ);
+                                
+                                GameObject temp = Instantiate(playerPrefab, tempPos, Quaternion.identity);
+                                client.objectsInScene.Add(temp);
+
+                                        
+                                temp.GetComponent<OnlinePlayerController>().id = ownedObject.playerID;
+                                
+                                if (client.localPlayer.PlayerID == ownedObject.playerID)
+                                {
+                                    client.localPlayer.playerOwnedObjects.Add(ownedObject);
+                                }
+                            }
                         
                             break;
                     
                         // case ObjectType.Bullet
                     }
 
-                    if (client.localPlayer.PlayerID == ownedObject.playerID)
-                    {
-                        client.localPlayer.playerOwnedObjects.Add(ownedObject);
-                    }
+                    
                 
                     break;
                 

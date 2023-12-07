@@ -196,6 +196,15 @@ public class Player
     }
 }
 
+// [Serializable]
+public class DataToHandle
+{
+    public Player player = null;
+    public DataUpdateType dataUpdateType;
+    public object deserializedData;
+
+}
+
 [Serializable]
 public class PlayerID
 {

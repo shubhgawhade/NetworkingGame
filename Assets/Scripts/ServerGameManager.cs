@@ -42,8 +42,8 @@ public class ServerGameManager : MonoBehaviour
                 
                 case GameState.gameStateEnum.Game:
 
-                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
-                    SpawnPlayers();
+                    SceneManager.LoadScene(1);
+                    // SpawnPlayers();
                     
                     break;
             }
