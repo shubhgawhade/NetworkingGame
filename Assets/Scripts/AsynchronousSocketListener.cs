@@ -15,7 +15,7 @@ public class AsynchronousSocketListener
 
     public List<Player> playersConnected = new List<Player>();
     
-    public List<DataToHandle> receivedDataToHandle = new List<DataToHandle>();
+    public Queue<DataToHandle> receivedDataToHandle = new Queue<DataToHandle>();
     
     // Thread signal.
     public static ManualResetEvent allDone = new ManualResetEvent(false);
@@ -152,78 +152,11 @@ public class AsynchronousSocketListener
                 deserializedData = deserialized
             };
             
-            receivedDataToHandle.Add(dataToHandle);
+            receivedDataToHandle.Enqueue(dataToHandle);
             
             state.dataRecd = new byte[sizeof(int)];
             handler.BeginReceive(state.dataRecd, 0, 0, 0, 
                 new AsyncCallback(CheckForDataLength), state);
-        }
-    }
-
-    // public static Action<Player, object, DataUpdateType> ProcessDataServer;
-    
-    private void HandleDataServer(Player state, byte[] data)
-    {
-        switch (state.dataUpdateType)
-        {
-            case DataUpdateType.Joining:
-                    
-                JoiningData joiningData = (JoiningData)state.ByteArrayToObject(data);
-                if (state.playerName == null)
-                {
-                    // Debug.Log("HAS JOINING DATA");
-                    // state.playerName = joiningData.playerName;
-                    // state.PlayerID = joiningData.playerID;
-                    // Debug.Log($"{state.playerName} CONNECTED!");
-
-                    for (int i = 0; i < playersConnected.Count; i++)
-                    {
-                        // int randomID = Random.Range(1000, 9999);
-                        // if (randomID != playersConnected[i].PlayerID)
-                        {
-                            // state.PlayerID = 1;
-                        }
-                    }
-                    // ProcessDataServer(state, joiningData, state.dataUpdateType);
-                    
-                    // SendData.Send(state, state.dataRecd, SendData.SendType.ReplyAllButSender);
-                }
-            
-                break;
-            
-            case DataUpdateType.Ready:
-
-                ReadyStatus readyStatus = (ReadyStatus)state.ByteArrayToObject(data);
-                // readyStatus.playerID = 1;
-                readyStatus.playerID = state.PlayerID;
-                state.ready = readyStatus.ready;
-
-                state.dataToSend = state.ObjectToByteArray(readyStatus);
-                SendData.Send(state, state.dataToSend, SendData.SendType.ReplyAll);
-
-                // if (playersConnected.Count > 1)
-                {
-                    foreach (Player player in playersConnected)
-                    {
-                        if(!player.ready) return;
-                    }
-                    
-                    // ProcessDataServer(state, readyStatus, DataUpdateType.Ready);
-                }
-                
-                break;
-                
-            case DataUpdateType.Transform:
-
-                TransformData transformData = (TransformData)state.ByteArrayToObject(data);
-                string content = $"{transformData.pos._posX}, {transformData.pos._posY}, {transformData.pos._posZ}";
-                Debug.Log($"{state.playerName} : {content}");
-                
-                transformData.playerID = state.PlayerID;
-                state.dataToSend = state.ObjectToByteArray(transformData);
-                SendData.Send(state, state.dataToSend, SendData.SendType.ReplyAllButSender);
-                    
-                break;
         }
     }
     
@@ -253,7 +186,7 @@ public class AsynchronousSocketListener
             deserializedData = joinLeaveData
         };
             
-        receivedDataToHandle.Add(dataToHandle);
+        receivedDataToHandle.Enqueue(dataToHandle);
         
         state.dataToSend = state.ObjectToByteArray(joinLeaveData);
         

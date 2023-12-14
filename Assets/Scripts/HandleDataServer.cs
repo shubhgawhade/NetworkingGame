@@ -7,17 +7,34 @@ public class HandleDataServer : MonoBehaviour
 {
     private AsynchronousSocketListener server;
     
+    NetworkTimer networkTimer;
+    
     public const int MaxPlayers = 4;
     
     public List<int> _playerIDs = new List<int>();
     // private int[] playerIDs = { 1, 2, 3, 4 };
 
-
     public GameState gameState = new GameState();
+
+    public Queue<InputData> inputQueue = new Queue<InputData>();
+    
+    [Serializable]
+    public struct StatePayload
+    {
+        public int tick;
+        public Vector3 position;
+        public Quaternion rotation;
+        public Vector3 velocity;
+    };
+    
+    public StatePayload[] stateBuffer = new StatePayload[2048];
+
+    public int[] lastProcessedTick = {-1, -1};
     
     private void Awake()
     {
         server = AsynchronousSocketListener.asynchronousSocketListener;
+        networkTimer = new NetworkTimer(30);
     }
 
     // Start is called before the first frame update
@@ -27,103 +44,181 @@ public class HandleDataServer : MonoBehaviour
         {
             _playerIDs.Add(i);
         }
-        
-        // AsynchronousSocketListener.ProcessDataServer += ProcessDataServer;
     }
 
-    void ProcessDataServer(Player state, object data, DataUpdateType dataTye)
+    private InputData inputData;
+    private async void FixedUpdate()
     {
-        switch (state.dataUpdateType)
+        // networkTimer.Update(Time.deltaTime);
+
+        while (networkTimer.ShouldTick()) 
         {
-            case DataUpdateType.Joining:
-
-                JoiningData joiningData = (JoiningData) data;
-                
-                state.playerName = joiningData.playerName;
-                
-                state.dataUpdateType = DataUpdateType.JoiningDataReply;
-                JoinLeaveData joinLeaveData = (JoinLeaveData) state.returnDataStruct;
-
-                if (_playerIDs.Count == 0)
-                {
-                    Debug.LogWarning($"{state.playerName} tried to join when SERVER HAS MAX PLAYERS");
-                    // MAX PLAYERS : SEND DISCONNECTION
-
-                    server.QuitClient(state.workSocket, state, -1);
-                    
-                    break;
-                }
-                
-                print(_playerIDs.Count);
-                if (_playerIDs.Count > 0)
-                {
-                    state.PlayerID = _playerIDs[0];
-                    Debug.Log($"{state.playerName} CONNECTED!");
-                    
-                    _playerIDs.Remove(_playerIDs[0]);
-                }
-                else
-                {
-                    
-                }
-                
-                joinLeaveData.playersConnected = new string[ExternServer.ConnectedPlayers.Count];
-                joinLeaveData.playerIDs = new int[ExternServer.ConnectedPlayers.Count];
-                joinLeaveData.ready = new bool[ExternServer.ConnectedPlayers.Count];
-                for (int i = 0; i < ExternServer.ConnectedPlayers.Count; i++)
-                {
-                    joinLeaveData.playersConnected[i] = ExternServer.ConnectedPlayers[i].playerName;
-                    joinLeaveData.playerIDs[i] = ExternServer.ConnectedPlayers[i].PlayerID;
-                    joinLeaveData.ready[i] = ExternServer.ConnectedPlayers[i].ready;
-                }
-                // joiningDataReply.playersConnected = "AA";
-                state.dataToSend = state.ObjectToByteArray(joinLeaveData);
-                Debug.Log($"{state.dataToSend.Length} {state.dataUpdateType}");
-                SendData.Send(state, state.dataToSend, SendData.SendType.ReplyAll);
-                
-                break;
+            // print(networkTimer.CurrentTick + $" - {DateTime.UtcNow.Second}:{DateTime.UtcNow.Millisecond}");
             
-            case DataUpdateType.Ready:
+            //Handle server tick
+            // If received input in Queue, go to last performed step ad re-simulate to the tick for new input
+            // Store the input and position states in buffers, same as tick number and process from that point
 
-                ReadyStatus readyStatus = (ReadyStatus) data;
-                if (readyStatus.ready)
+            while (inputQueue.Count > 0)
+            {
+                inputData = inputQueue.Dequeue();
+
+                    foreach (GameObject o in ObjectsInScene)
                 {
+                        if (o.GetComponent<OnlinePlayerController>().id == inputData.playerID)
+                    {
+                        // print(o.name);
+                    if (inputData.tick < lastProcessedTick[inputData.playerID])
+                    {
+                        while ((stateBuffer[lastProcessedTick[inputData.playerID]].position - o.transform.position)
+                               .magnitude > 0.1f)
+                            {
+                                // o.transform.position = Vector3.Lerp(o.transform.position,
+                                //     stateBuffer[lastProcessedTick[inputData.playerID]].position, Time.fixedDeltaTime);
 
-                    // SceneManager.LoadScene(1);
-                    print("Start Game");
-
-                    gameState.ChangeState(GameState.gameStateEnum.Game);
-
-                    // SpawnPlayers();
-
-                    // state.dataUpdateType = DataUpdateType.StartGame;
-                    // StartGameData startGameData = (StartGameData)state.returnDataStruct;
-                    // startGameData.playerID = state.PlayerID;
-
+                                o.transform.position = stateBuffer[lastProcessedTick[inputData.playerID]].position;
+                            }
+                            // o.GetComponent<Rigidbody>().velocity = stateBuffer[lastProcessedTick].velocity;
+                        }
+                    }
                 }
-                
-                break;
+
+                // foreach (GameObject o in ObjectsInScene)
+                // {
+                //     // print(o.name);
+                //     if (o.GetComponent<OnlinePlayerController>().id == inputData.playerID)
+                //     {
+                //         // Add to Input Queue with tick number
+                //
+                //         // print(inputData.playerID);
+                //         float move = inputData.right;
+                //         while (inputData.tick < networkTimer.CurrentTick)
+                //         {
+                //             Physics.simulationMode = SimulationMode.Script;
+                //             o.GetComponent<OnlinePlayerController>().Move(move, networkTimer.MinTimeBetweenTicks);
+                //             Physics.Simulate(Time.fixedDeltaTime);
+                //             Physics.simulationMode = SimulationMode.FixedUpdate;
+                //
+                //             print(inputData.tick);
+                //             stateBuffer[inputData.tick] = new StatePayload
+                //             {
+                //                 tick = inputData.tick,
+                //                 position = o.transform.position,
+                //                 // rb = o.GetComponent<Rigidbody>()
+                //                 velocity = o.GetComponent<Rigidbody>().velocity
+                //             };
+                //             lastProcessedTick = inputData.tick;
+                //             inputData.tick++;
+                //         }
+                //     }
+                // }
+            }
+
+            if (inputData == null) return;
             
-            case DataUpdateType.JoiningDataReply:
-
-                JoinLeaveData joinLeaveDataa = (JoinLeaveData) data;
-                if (joinLeaveDataa.errorCode != -1)
+            foreach (GameObject o in ObjectsInScene)
+            {
+                // print(o.name);
+                if (o.GetComponent<OnlinePlayerController>().id == inputData.playerID)
                 {
-                    _playerIDs.Insert(0, state.PlayerID);
+                    // Add to Input Queue with tick number
+                        
+                    // print(inputData.playerID);
+                    float move = inputData.right;
+                    while (inputData.tick <= networkTimer.CurrentTick)
+                    {
+                        // Physics.simulationMode = SimulationMode.Script;
+                        print(move);
+                        // Physics.Simulate(networkTimer.MinTimeBetweenTicks);
+                        o.GetComponent<OnlinePlayerController>().Move(move, networkTimer.MinTimeBetweenTicks);
+                        // Physics.simulationMode = SimulationMode.FixedUpdate;
+                    
+                        print($"CT {inputData.tick} : NT {networkTimer.CurrentTick}");
+                        stateBuffer[inputData.tick] = new StatePayload
+                        {
+                            tick = inputData.tick,
+                            position = o.transform.position,
+                            // rb = o.GetComponent<Rigidbody>()ss
+                            // velocity = o.GetComponent<Rigidbody>().velocity
+                        };
+                        lastProcessedTick[inputData.playerID] = inputData.tick;
+                        
+                        // SEND SERVER SIMULATION EVERY 15 ticks = 0.495s
+                        if (networkTimer.CurrentTick % 10 == 0)
+                        {
+                            Player tempPlayer = new Player();
+                            
+                            foreach (Player player in server.playersConnected)
+                            {
+                                if (player.PlayerID == inputData.playerID)
+                                {
+                                    tempPlayer.dataUpdateType = DataUpdateType.Transform;
+                                    TransformData td = (TransformData) tempPlayer.returnDataStruct; 
+                                    
+                                    td = new TransformData
+                                    {
+                                        tick = networkTimer.CurrentTick,
+                                        playerID = inputData.playerID,
+                                        pos = new Pos
+                                        {
+                                            _posX = o.transform.position.x,
+                                            _posY = o.transform.position.y,
+                                            _posZ = o.transform.position.z
+                                        }
+                                    };
+                                    
+                                    tempPlayer.dataToSend = tempPlayer.ObjectToByteArray(td);
+                                    await SendData.Send(tempPlayer, tempPlayer.dataToSend, SendData.SendType.ReplyAll);
+                                }
+                            }
+                        }
+                        
+                        inputData.tick++;
+                    }
+                    
+                    // while (inputData.tick < networkTimer.CurrentTick)
+                    // {
+                    // Physics.simulationMode = SimulationMode.Script;
+                    // Physics.Simulate(MathF.Abs(networkTimer.CurrentTick - inputData.tick) * networkTimer.MinTimeBetweenTicks);
+                    // o.GetComponent<OnlinePlayerController>().Move(inputData.right, networkTimer.MinTimeBetweenTicks);
+                    // // inputData.tick++;
+                    // print(inputData.tick);
+                    // Physics.simulationMode = SimulationMode.FixedUpdate;
+                    // stateBuffer[networkTimer.CurrentTick] = new StatePayload
+                    // {
+                    //     tick = inputData.tick,
+                    //     position = o.transform.position,
+                    //     // rb = o.GetComponent<Rigidbody>()
+                    //     velocity = o.GetComponent<Rigidbody>().velocity
+                    // };
+                    // lastProcessedTick = networkTimer.CurrentTick;
+                    // }
+                        
+                    // Get the ticks between inputs, simulate and send position data back
+                        
+                    // Physics.Simulate(Time.fixedDeltaTime * 5);
+                    // print(o.transform.position.x);
                 }
-                
-                break;
+            }
         }
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (server.receivedDataToHandle.Count > 0)
+        networkTimer.Update(Time.deltaTime);
+        // networkTimer.ShouldTick();
+        // print(networkTimer.CurrentTick + $" - {DateTime.UtcNow.Second}:{DateTime.UtcNow.Millisecond}");
+        if (server.receivedDataToHandle.Count > 1)
         {
-            DataToHandle data = server.receivedDataToHandle[0];
+            print("SERVER Q COUNT : " + server.receivedDataToHandle.Count);
+        }
+        
+        while (server.receivedDataToHandle.Count > 0)
+        {
+            DataToHandle data = server.receivedDataToHandle.Dequeue();
 
-            switch (server.receivedDataToHandle[0].dataUpdateType)
+            switch (data.dataUpdateType)
             {
                 case DataUpdateType.Joining:
                     
@@ -145,7 +240,7 @@ public class HandleDataServer : MonoBehaviour
                             break;
                         }
                 
-                        print(_playerIDs.Count);
+                        // print(_playerIDs.Count);
                         if (_playerIDs.Count > 0)
                         {
                             data.player.PlayerID = _playerIDs[0];
@@ -157,7 +252,7 @@ public class HandleDataServer : MonoBehaviour
                         {
                     
                         }
-                
+
                         joinLeaveData.playersConnected = new string[ExternServer.ConnectedPlayers.Count];
                         joinLeaveData.playerIDs = new int[ExternServer.ConnectedPlayers.Count];
                         joinLeaveData.ready = new bool[ExternServer.ConnectedPlayers.Count];
@@ -168,6 +263,12 @@ public class HandleDataServer : MonoBehaviour
                             joinLeaveData.ready[i] = ExternServer.ConnectedPlayers[i].ready;
                         }
                         // joiningDataReply.playersConnected = "AA";
+                        
+                        joinLeaveData.tick = networkTimer.CurrentTick;
+                        joinLeaveData.subTick = networkTimer.timer;
+                        
+                        print(networkTimer.CurrentTick);
+                        
                         data.player.dataToSend = data.player.ObjectToByteArray(joinLeaveData);
                         Debug.Log($"{data.player.dataToSend.Length} {data.player.dataUpdateType}");
                         SendData.Send(data.player, data.player.dataToSend, SendData.SendType.ReplyAll);
@@ -212,6 +313,33 @@ public class HandleDataServer : MonoBehaviour
                 
                     break;
                 
+                case DataUpdateType.Input:
+
+                    InputData inputData = (InputData) data.deserializedData;
+
+                    // print(inputData.right);
+
+                    inputQueue.Enqueue(inputData);
+                    // foreach (GameObject o in ObjectsInScene)
+                    // {
+                    //     print(o.name);
+                    //     if (o.GetComponent<OnlinePlayerController>().id == inputData.playerID)
+                    //     {
+                    //         // Add to Input Queue with tick number
+                    //         
+                    //         print(inputData.playerID);
+                    //         o.GetComponent<OnlinePlayerController>().Move(inputData.right, networkTimer.MinTimeBetweenTicks);
+                    //         // Physics.simulationMode = SimulationMode.Script;
+                    //         
+                    //         // Get the ticks between inputs, simulate and send position data back
+                    //         
+                    //         // Physics.Simulate(Time.fixedDeltaTime * 5);
+                    //         // print(o.transform.position.x);
+                    //     }
+                    // }
+                    
+                    break;
+                
                 case DataUpdateType.Transform:
 
                     TransformData transformData = (TransformData) data.deserializedData;
@@ -234,8 +362,6 @@ public class HandleDataServer : MonoBehaviour
                 
                     break;
             }
-            
-            server.receivedDataToHandle.Remove(server.receivedDataToHandle[0]);
         }
     }
 
@@ -265,6 +391,7 @@ public class HandleDataServer : MonoBehaviour
                 _posZ = tempPos.z
             };
             ownedObject.playerID = ExternServer.ConnectedPlayers[i].PlayerID;
+            temp.GetComponent<OnlinePlayerController>().id = ownedObject.playerID;
             
             // Send connected players,their objects to spawn
             ExternServer.ConnectedPlayers[i].dataUpdateType = DataUpdateType.OwnedObject;
@@ -288,6 +415,6 @@ public class HandleDataServer : MonoBehaviour
     
     private void OnApplicationQuit()
     {
-        // AsynchronousSocketListener.ProcessDataServer -= ProcessDataServer;
+        
     }
 }

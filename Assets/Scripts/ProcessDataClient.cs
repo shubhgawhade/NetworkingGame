@@ -21,11 +21,11 @@ public class ProcessDataClient : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (client.receivedDataToHandle.Count > 0)
+        while (client.receivedDataToHandle.Count > 0)
         {
-            DataToHandle data = client.receivedDataToHandle[0];
+            DataToHandle data = client.receivedDataToHandle.Dequeue();
             
-            switch (client.receivedDataToHandle[0].dataUpdateType)
+            switch (data.dataUpdateType)
             {
                 case DataUpdateType.Ready:
 
@@ -49,6 +49,29 @@ public class ProcessDataClient : MonoBehaviour
                     {
                         print("SERVER HAS MAX PLAYERS");
                         break;
+                    }
+
+                    if (client.tickSynced)
+                    {
+                        // print("SETTING");
+                        // float a = joinLeaveData.tick + client.pingTimer*15;
+
+                        // if (client.pingTimer > 1.0f/30) client.pingTimer /= 2;
+
+                        if (client.pingTimer >= 1.0f/30)
+                        {
+                            // float ping = client.pingTimer / 2;
+                            // float setTimer = (ping + joinLeaveData.subTick) % 1.0f/30;
+                            int a = (int)Mathf.Floor((client.pingTimer / 4 + joinLeaveData.subTick) / (1.0f/30));
+                            client.networkTimer = new NetworkTimer(30, joinLeaveData.tick + a, 
+                                client.pingTimer / 2 + joinLeaveData.subTick);
+                        }
+                        else
+                        {
+                            int a = (int)Mathf.Floor((client.pingTimer + joinLeaveData.subTick) / (1.0f/30));
+                            client.networkTimer = new NetworkTimer(30, joinLeaveData.tick + a, 
+                                joinLeaveData.subTick + client.pingTimer/2);
+                        }
                     }
                     
                     // New player joined Server
@@ -80,6 +103,7 @@ public class ProcessDataClient : MonoBehaviour
                                 // print(player.PlayerID);
                                 client.playersConnected.Add(player);
                                 Debug.Log($"{player.playerName} CONNECTED!");
+                                client.clientStatus = ClientNew.ClientStatus.Connected;
                             }
                         }
                     }
@@ -172,9 +196,18 @@ public class ProcessDataClient : MonoBehaviour
                     {
                         if (o.GetComponent<OnlinePlayerController>().id == transformData.playerID)
                         {
-                            Vector3 tempPos = new Vector3(transformData.pos._posX, transformData.pos._posY,
-                                transformData.pos._posZ);
-                            o.transform.position = tempPos;
+                            if (!o.GetComponent<OnlinePlayerController>().ShouldReconcile(transformData))
+                            {
+                                Vector3 tempPos = new Vector3(transformData.pos._posX, transformData.pos._posY,
+                                    transformData.pos._posZ);
+                                
+                                while ((tempPos - o.transform.position).magnitude > 0.3f)
+                                {
+                                    o.transform.position = Vector3.Lerp(o.transform.position,
+                                        tempPos, client.networkTimer.MinTimeBetweenTicks);
+                                }
+                            }
+                            // o.transform.position = tempPos;
                         }
                     }
                     
@@ -188,8 +221,6 @@ public class ProcessDataClient : MonoBehaviour
                 
                     break;
             }
-
-            client.receivedDataToHandle.Remove(client.receivedDataToHandle[0]);
         }
         
         // if (player.receivedData)

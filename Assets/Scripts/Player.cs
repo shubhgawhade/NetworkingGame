@@ -28,6 +28,7 @@ public enum DataUpdateType
     Ready,
     StartGame,
     OwnedObject,
+    Input,
     Transform,
     Heath
 }
@@ -91,6 +92,13 @@ public class Player
                 StartGameData sgd = new StartGameData();
                 return sgd;
                     
+                break;
+            
+            case DataUpdateType.Input:
+
+                InputData id = new InputData();
+                return id;
+                
                 break;
             
             case DataUpdateType.Transform:
@@ -178,6 +186,13 @@ public class Player
                     
                     break;
                 
+                case DataUpdateType.Input:
+                    
+                    InputData inputData = (InputData) binaryFormatter.Deserialize(memoryStream);
+                    return inputData;
+                    
+                    break;
+                
                 case DataUpdateType.Transform:
 
                     TransformData transformData = (TransformData) binaryFormatter.Deserialize(memoryStream);
@@ -188,12 +203,19 @@ public class Player
         }
         catch (Exception e)
         {
-            Debug.Log(e);
+            Debug.LogWarning(e + $"{dataUpdateType}");
             throw;
         }
 
         return null;
     }
+}
+
+[Serializable]
+public class Tick
+{
+    public int tick;
+    public float subTick;
 }
 
 // [Serializable]
@@ -203,6 +225,14 @@ public class DataToHandle
     public DataUpdateType dataUpdateType;
     public object deserializedData;
 
+}
+
+[Serializable]
+public class InputData : PlayerID
+{
+    public int tick;
+    public int right;
+    public bool jump;
 }
 
 [Serializable]
@@ -218,7 +248,7 @@ public class JoiningData : PlayerID
 }
 
 [Serializable]
-public class JoinLeaveData
+public class JoinLeaveData : Tick
 {
     public int errorCode;
     // CODES
@@ -269,15 +299,16 @@ public class Pos
 [Serializable]
 public class TransformData : PlayerID
 {
+    public int tick;
     public Pos pos;
     
-    [Serializable]
-    public class Rot
-    {
-        public float _rotX;
-        public float _rotY;
-        public float _rotZ;
-    }
-
-    public Rot rot;
+    // [Serializable]
+    // public class Rot
+    // {
+    //     public float _rotX;
+    //     public float _rotY;
+    //     public float _rotZ;
+    // }
+    //
+    // public Rot rot;
 }

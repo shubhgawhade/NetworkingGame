@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Serialization;
-using Random = UnityEngine.Random;
 
 public class ClientNew : MonoBehaviour
 {
+    public bool tickSynced;
+    public float pingTimer;
+    public NetworkTimer networkTimer;
+    
     private Socket _clientSocket;
     static readonly Int32 Port = 7777;
     private static readonly IPAddress ServerAddress = IPAddress.Parse("192.168.0.118");
@@ -25,6 +26,8 @@ public class ClientNew : MonoBehaviour
     public List<Player> playersConnected = new List<Player>();
     
     public List<GameObject> objectsInScene = new List<GameObject>();
+    
+    public Queue<DataToHandle> receivedDataToHandle = new Queue<DataToHandle>();
     
     public enum ClientStatus
     {
@@ -52,10 +55,42 @@ public class ClientNew : MonoBehaviour
     
     // private Byte[] bytes = new Byte[4];
     public Player ServerPlayer;
-    
+
+    // private void FixedUpdate()
+    // {
+    //     // if (!tickSynced)
+    //     // {
+    //     //     pingTimer += Time.deltaTime;
+    //     // }
+    //     
+    //     if (networkTimer != null)
+    //     {
+    //         // networkTimer.Update(Time.deltaTime);
+    //         
+    //         while (networkTimer.ShouldTick()) 
+    //         {
+    //             // print(networkTimer.CurrentTick + $" - {DateTime.UtcNow.Second}:{DateTime.UtcNow.Millisecond}");
+    //             
+    //             
+    //         }
+    //     }
+    // }
+
     // Update is called once per frame
     void Update()
     {
+        if (networkTimer != null)
+        {
+            networkTimer.Update(Time.deltaTime);
+            // networkTimer.ShouldTick();
+            // print(networkTimer.CurrentTick + $" - {DateTime.UtcNow.Second}:{DateTime.UtcNow.Millisecond}");
+        }
+        
+        if (!tickSynced)
+        {
+            pingTimer += Time.deltaTime;
+        }
+        
         if (Input.GetKeyDown(KeyCode.R))
         {
             localPlayer.dataUpdateType = DataUpdateType.Ready;
@@ -150,6 +185,9 @@ public class ClientNew : MonoBehaviour
 
             // Send(sizeOfMsg, bytes);
             await SendData.Send(localPlayer, ServerPlayer.dataToSend, SendData.SendType.ReplyOne);
+            
+            // networkTimer = new NetworkTimer(30);
+            
             ServerPlayer.dataToSend = new byte[sizeof(int)];
 
             // try
@@ -166,6 +204,7 @@ public class ClientNew : MonoBehaviour
             // ServerPlayer = new Player();
             _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 4, 0, 
                 new AsyncCallback(CheckForDataLength), ServerPlayer);
+            pingTimer = 0;
         }
         catch (Exception e)
         {
@@ -183,7 +222,12 @@ public class ClientNew : MonoBehaviour
         Player serverPlayer = (Player) ar.AsyncState;
         
         int bytesRead = _clientSocket.EndReceive(ar);
-
+        
+        if (!tickSynced)
+        {
+            tickSynced = true;
+        }
+        
         if (bytesRead == 0)
         {
             Disconnect(2);
@@ -200,6 +244,7 @@ public class ClientNew : MonoBehaviour
         updateType[0] = serverPlayer.dataRecd[bytesRead - 1];
         // state.updateVal = ;
         serverPlayer.dataUpdateType = (DataUpdateType)int.Parse(System.Text.Encoding.ASCII.GetString(updateType));
+        
         for (int i = 0; i < bytesRead - 1; i++)
         {
             sizeVal[i] = serverPlayer.dataRecd[i];
@@ -224,9 +269,7 @@ public class ClientNew : MonoBehaviour
         }
         
     }
-
-    // public static Action<Player, byte[]> HandleData;
-
+    
     private void ReceiveData(IAsyncResult ar)
     {
         Player serverPlayer = (Player) ar.AsyncState;
@@ -263,7 +306,7 @@ public class ClientNew : MonoBehaviour
                 deserializedData = deserialized
             };
             
-            receivedDataToHandle.Add(dataToHandle);
+            receivedDataToHandle.Enqueue(dataToHandle);
 
             
             // AddToTaskList();
@@ -281,152 +324,6 @@ public class ClientNew : MonoBehaviour
         // player.dataRecd = new byte[sizeof(int)];
     }
     
-    public List<DataToHandle> receivedDataToHandle = new List<DataToHandle>();
-
-    public void AddToTaskList()
-    {
-    }
-    
-    // public bool receivedData;
-    private void HandleDataPlayer(Player state, byte[] data)
-    {
-        // receivedData = true;
-        
-        switch (state.dataUpdateType)
-        {
-            case DataUpdateType.Ready:
-
-                ReadyStatus readyStatus = (ReadyStatus)state.ByteArrayToObject(data);
-                foreach (Player player in playersConnected)
-                {
-                    if (player.PlayerID == readyStatus.playerID)
-                    {
-                        player.ready = readyStatus.ready;
-                        break;
-                    }
-                }
-                
-                print($"{readyStatus.playerID} {readyStatus.ready}");
-                
-                break;
-                
-            case DataUpdateType.JoiningDataReply:
-
-                JoinLeaveData joinLeaveData = (JoinLeaveData)state.ByteArrayToObject(data);
-                // print(joiningDataReply.playersConnected);
-                
-                // playersConnected = new List<Player>();
-
-                if (joinLeaveData.errorCode == -1)
-                {
-                    print("SERVER HAS MAX PLAYERS");
-                    break;
-                }
-                
-                // New player joined Server
-                if (playersConnected.Count <= joinLeaveData.playersConnected.Length)
-                {
-                    for (int i = 0; i < joinLeaveData.playersConnected.Length; i++)
-                    {
-                        if (playersConnected.Count == 0)
-                        {
-                            print(joinLeaveData.playerIDs[i]);
-                            localPlayer.PlayerID = joinLeaveData.playerIDs[joinLeaveData.playersConnected.Length - 1];
-                        }
-                        
-                        if (i < playersConnected.Count)
-                        {
-                            playersConnected[i].playerName = joinLeaveData.playersConnected[i];
-                            playersConnected[i].PlayerID = joinLeaveData.playerIDs[i];
-                            playersConnected[i].ready = joinLeaveData.ready[i];
-                        }
-                        else
-                        {
-                            Player player = new Player
-                            {
-                                playerName = joinLeaveData.playersConnected[i],
-                                PlayerID = joinLeaveData.playerIDs[i],
-                                ready = joinLeaveData.ready[i]
-                            };
-
-                            // print(player.PlayerID);
-                            playersConnected.Add(player);
-                            Debug.Log($"{player.playerName} CONNECTED!");
-                        }
-                    }
-                }
-                // Player left Server
-                else if (playersConnected.Count > joinLeaveData.playersConnected.Length)
-                {
-                    foreach (Player player in playersConnected)
-                    {
-                        bool stillConnected = false;
-                        foreach (int playerID in joinLeaveData.playerIDs)
-                        {
-                            if (player.PlayerID == playerID)
-                            {
-                                stillConnected = true;
-                                break;
-                            }
-
-                        }
-
-                        if (!stillConnected)
-                        {
-                            playersConnected.Remove(player);
-                            break;
-                        }
-                    }
-                }
-                
-                break;
-            
-            case DataUpdateType.OwnedObject:
-
-                gameState.ChangeState(GameState.gameStateEnum.Game);
-                
-                localPlayer.dataRecd = data;
-                OwnedObject ownedObject = (OwnedObject)state.ByteArrayToObject(data);
-                print(ownedObject.objectType);
-
-                if (localPlayer.PlayerID == ownedObject.playerID)
-                {
-                    localPlayer.playerOwnedObjects.Add(ownedObject);
-                }
-
-
-                // switch ((ObjectType)ownedObject.objectType)
-                // {
-                //     case ObjectType.Player:
-                //         
-                //         GameObject temp = Instantiate(playerPrefab, new Vector3(2, 0, 0), Quaternion.identity);
-                //         playerObjects.Add(temp);
-                //         
-                //         break;
-                //     
-                //     // case ObjectType.Bullet
-                // }
-                
-                break;
-            
-            case DataUpdateType.Transform:
-
-                localPlayer.dataRecd = data;
-                TransformData transformData = (TransformData)state.ByteArrayToObject(data);
-                string content = $"{transformData.pos._posX}, {transformData.pos._posY}, {transformData.pos._posZ}";
-
-                foreach (Player player in playersConnected)
-                {
-                    if (player.PlayerID == transformData.playerID)
-                    {
-                        Debug.Log($"{player.playerName} : {content}");
-                    }
-                }
-                
-                break;
-        }
-    }
-
     public void Disconnect(int errorCode)
     {
         // _clientSocket.Shutdown(SocketShutdown.Both);

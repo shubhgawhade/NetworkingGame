@@ -505,7 +505,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7515890535252095814, guid: 17d7a2be80d72bf4292135d2c010e6c2, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2120,7 +2120,7 @@ PrefabInstance:
     - target: {fileID: 1000374455157203742, guid: f46167fd64363ab49b9ed2250b9c66c5, type: 3}
       propertyPath: playerPrefab
       value: 
-      objectReference: {fileID: 3431105083004858709, guid: 8d74f857141e1b946bb4c1ba525da26c, type: 3}
+      objectReference: {fileID: 3431105083004858709, guid: d65fafc2ea1e6d248b8e1664105c08d6, type: 3}
     - target: {fileID: 1780208514105572120, guid: f46167fd64363ab49b9ed2250b9c66c5, type: 3}
       propertyPath: m_RootOrder
       value: 5
@@ -2171,7 +2171,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3036351901979077798, guid: f46167fd64363ab49b9ed2250b9c66c5, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2199,7 +2199,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ObjectsInScene: []
-  playerPrefab: {fileID: 3431105083004858709, guid: 8d74f857141e1b946bb4c1ba525da26c, type: 3}
+  playerPrefab: {fileID: 3431105083004858709, guid: d65fafc2ea1e6d248b8e1664105c08d6, type: 3}
 --- !u!1 &1549474145
 GameObject:
   m_ObjectHideFlags: 0
@@ -2556,10 +2556,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 929188381981047048, guid: d65fafc2ea1e6d248b8e1664105c08d6, type: 3}
-      propertyPath: m_RootOrder
-      value: 4
-      objectReference: {fileID: 0}
     - target: {fileID: 929188381981047048, guid: d65fafc2ea1e6d248b8e1664105c08d6, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
