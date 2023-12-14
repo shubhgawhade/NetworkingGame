@@ -133,7 +133,7 @@ public class HandleDataServer : MonoBehaviour
                         o.GetComponent<OnlinePlayerController>().Move(move, networkTimer.MinTimeBetweenTicks);
                         // Physics.simulationMode = SimulationMode.FixedUpdate;
                     
-                        print($"CT {inputData.tick} : NT {networkTimer.CurrentTick}");
+                        // print($"CT {inputData.tick} : NT {networkTimer.CurrentTick}");
                         stateBuffer[inputData.tick] = new StatePayload
                         {
                             tick = inputData.tick,
@@ -174,6 +174,7 @@ public class HandleDataServer : MonoBehaviour
                         }
                         
                         inputData.tick++;
+                        if(inputData.tick > 2048) break;
                     }
                     
                     // while (inputData.tick < networkTimer.CurrentTick)

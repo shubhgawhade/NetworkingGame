@@ -189,9 +189,11 @@ public class OnlinePlayerController : MonoBehaviour
     }
 
     private Vector3 tempPos;
-    private Vector3 predictedPos;
+    private Vector3 predictedPlayerPos;
     public bool ShouldReconcile(TransformData transformData)
     {
+        if (!isOwner) return false;
+        
         int dataTick = transformData.tick;
         tempPos = new Vector3(transformData.pos._posX, transformData.pos._posY,
             transformData.pos._posZ);
@@ -200,10 +202,10 @@ public class OnlinePlayerController : MonoBehaviour
         while (dataTick <= ClientGameManager.client.networkTimer.CurrentTick)
         {
             Vector3 moveDir = new Vector3(inputBuffer[dataTick].right, 0, 0);
-            predictedPos = tempPos +
+            predictedPlayerPos = tempPos +
                            moveDir * (moveSpeed * ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
 
-            if (dataTick == ClientGameManager.client.networkTimer.CurrentTick && (positionBuffer[ClientGameManager.client.networkTimer.CurrentTick] - predictedPos).magnitude > 0.5f)
+            if (dataTick == ClientGameManager.client.networkTimer.CurrentTick && (positionBuffer[ClientGameManager.client.networkTimer.CurrentTick] - predictedPlayerPos).magnitude > 0.5f)
             {
                 shouldReconcile = true;
                 // transform.position = Vector3.Lerp(transform.position,
@@ -221,21 +223,16 @@ public class OnlinePlayerController : MonoBehaviour
                 shouldReconcile = false;
             }
 
-            tempPos = predictedPos;
+            tempPos = predictedPlayerPos;
             dataTick++;
         }
 
-        if (isOwner)
-        {
-            return shouldReconcile;
-        }
-        
-        return false;
+        return true;
     }
     
     private void Reconcile()
     {
         transform.position = Vector3.Lerp(transform.position,
-                predictedPos, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
+                predictedPlayerPos, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
     }
 }
