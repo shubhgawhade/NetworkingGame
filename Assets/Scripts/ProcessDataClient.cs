@@ -19,8 +19,31 @@ public class ProcessDataClient : MonoBehaviour
     }
 
     private bool updateOtherPos;
-    private TransformData otherPayersPos;
-    
+    private TransformData[] otherPayersPos;
+
+    private void FixedUpdate()
+    {
+        if (updateOtherPos && otherPayersPos != null)
+        {
+            // foreach (GameObject o in client.objectsInScene)
+            for (int i = 0; i < client.objectsInScene.Count; i++)
+            {
+                if(otherPayersPos[i] == null) continue;
+                
+                if (client.objectsInScene[i].GetComponent<OnlinePlayerController>().id == otherPayersPos[i].playerID)
+                {
+                    Vector3 tempPos = new Vector3(otherPayersPos[i].pos._posX, otherPayersPos[i].pos._posY,
+                        otherPayersPos[i].pos._posZ);
+                    // while ((tempPos - o.transform.position).magnitude > 0.3f)
+                    {
+                        client.objectsInScene[i].transform.position = Vector3.LerpUnclamped(client.objectsInScene[i].transform.position,
+                            tempPos, client.networkTimer.MinTimeBetweenTicks);
+                    }
+                }
+            }
+        }
+    }
+
     // Update is called once per frame
     void Update()
     {
@@ -195,14 +218,20 @@ public class ProcessDataClient : MonoBehaviour
                     TransformData transformData = (TransformData) data.deserializedData;
                     string content = $"{transformData.pos._posX}, {transformData.pos._posY}, {transformData.pos._posZ}";
 
-                    foreach (GameObject o in client.objectsInScene)
+                    // foreach (GameObject o in client.objectsInScene)
+                    for (int i = 0; i < client.objectsInScene.Count; i++)
                     {
-                        if (o.GetComponent<OnlinePlayerController>().id == transformData.playerID)
+                        if (client.objectsInScene[i].GetComponent<OnlinePlayerController>().id == transformData.playerID)
                         {
-                            if (!o.GetComponent<OnlinePlayerController>().ShouldReconcile(transformData))
+                            if (!client.objectsInScene[i].GetComponent<OnlinePlayerController>().ShouldReconcile(transformData))
                             {
                                 updateOtherPos = true;
-                                otherPayersPos = transformData;
+                                if (otherPayersPos == null)
+                                {
+                                    otherPayersPos = new TransformData[client.objectsInScene.Count];
+                                }
+                                
+                                otherPayersPos[i] = transformData;
                                 // Vector3 tempPos = new Vector3(transformData.pos._posX, transformData.pos._posY,
                                 //     transformData.pos._posZ);
                                 //
@@ -229,23 +258,6 @@ public class ProcessDataClient : MonoBehaviour
                     }
                 
                     break;
-            }
-        }
-
-        if (updateOtherPos && otherPayersPos != null)
-        {
-            foreach (GameObject o in client.objectsInScene)
-            {
-                if (o.GetComponent<OnlinePlayerController>().id == otherPayersPos.playerID)
-                {
-                    Vector3 tempPos = new Vector3(otherPayersPos.pos._posX, otherPayersPos.pos._posY,
-                        otherPayersPos.pos._posZ);
-                    // while ((tempPos - o.transform.position).magnitude > 0.3f)
-                    {
-                        o.transform.position = Vector3.Lerp(o.transform.position,
-                            tempPos, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
-                    }
-                }
             }
         }
         

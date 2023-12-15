@@ -65,59 +65,64 @@ public class OnlinePlayerController : MonoBehaviour
 
     public void Inputs()
     {
-        if (Input.GetAxis("Horizontal") != 0)
+        float horizontalInput = Input.GetAxis("Horizontal");
+        float verticalInput = Input.GetAxis("Vertical");
+        
+        if (horizontalInput != 0 || verticalInput != 0)
         {
-            if (Input.GetAxis("Horizontal") > 0)
+            if (horizontalInput > 0)
             {
-                // if (!inputData.right)
                 if(inputData.right != 1)
                 {
                     inputData.right = 1;
-                    // inputData.tick = ClientGameManager.client.networkTimer.CurrentTick;
-                    // inputData.left = false;
-                    
-                    // ClientGameManager.client.localPlayer.dataToSend = ClientGameManager.client.localPlayer.ObjectToByteArray(inputData);
-                    // SendData.Send(ClientGameManager.client.localPlayer, ClientGameManager.client.localPlayer.dataToSend, SendData.SendType.ReplyOne);
 
                     sendInputQueue.Enqueue(inputData);
-                    
                 }
-                    // Move(1, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
             }
-            else if (Input.GetAxis("Horizontal") < 0)
+            else if (horizontalInput < 0)
             {
-                // if (!inputData.left)
                 if(inputData.right != -1)
                 {    
-                    // inputData.left = true;
                     inputData.right = -1;
-                    // inputData.tick = ClientGameManager.client.networkTimer.CurrentTick;
-                    
-                    // ClientGameManager.client.localPlayer.dataToSend = ClientGameManager.client.localPlayer.ObjectToByteArray(inputData);
-                    // SendData.Send(ClientGameManager.client.localPlayer, ClientGameManager.client.localPlayer.dataToSend, SendData.SendType.ReplyOne);
                     
                     sendInputQueue.Enqueue(inputData);
-
                 }
-                    // Move(-1, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
+            }
+            
+            if (verticalInput > 0)
+            {
+                if(inputData.forward != 1)
+                {
+                    inputData.forward = 1;
+
+                    sendInputQueue.Enqueue(inputData);
+                }
+            }
+            else if (verticalInput < 0)
+            {
+                if(inputData.forward != -1)
+                {    
+                    inputData.forward = -1;
+                    
+                    sendInputQueue.Enqueue(inputData);
+                }
             }
         }
         else
         {
-            // if (inputData.right || inputData.left)
             if(inputData.right != 0)
             {
-                // inputData.left = false;
                 inputData.right = 0;
-                // inputData.tick = ClientGameManager.client.networkTimer.CurrentTick;
-                
-                // ClientGameManager.client.localPlayer.dataToSend = ClientGameManager.client.localPlayer.ObjectToByteArray(inputData);
-                // SendData.Send(ClientGameManager.client.localPlayer, ClientGameManager.client.localPlayer.dataToSend, SendData.SendType.ReplyOne);
                 
                 sendInputQueue.Enqueue(inputData);
-                
             }
-                // Move(0, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
+
+            if (inputData.forward != 0)
+            {
+                inputData.forward = 0;
+                
+                sendInputQueue.Enqueue(inputData);
+            }
         }
         
         positionBuffer[ClientGameManager.client.networkTimer.CurrentTick] = transform.position;
@@ -184,6 +189,7 @@ public class OnlinePlayerController : MonoBehaviour
     {
         // print(horizontalInput);
         Vector3 moveDir = new Vector3(horizontalInput, 0, 0);
+        moveDir.Normalize();
         transform.position += moveDir * (moveSpeed * timeBetweenTicks);
         // rb.AddForce(moveDir * (moveForce * timeBetweenTIcks), ForceMode.VelocityChange);
     }
@@ -208,7 +214,8 @@ public class OnlinePlayerController : MonoBehaviour
             predictedPlayerPos = tempPos +
                            moveDir * (moveSpeed * ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
 
-            if (dataTick == ClientGameManager.client.networkTimer.CurrentTick && (positionBuffer[ClientGameManager.client.networkTimer.CurrentTick] - predictedPlayerPos).magnitude > 0.5f)
+            if (dataTick == ClientGameManager.client.networkTimer.CurrentTick && 
+                (positionBuffer[ClientGameManager.client.networkTimer.CurrentTick] - predictedPlayerPos).magnitude > 0.5f)
             {
                 shouldReconcile = true;
                 // transform.position = Vector3.Lerp(transform.position,
@@ -235,7 +242,7 @@ public class OnlinePlayerController : MonoBehaviour
     
     private void Reconcile()
     {
-        transform.position = Vector3.Lerp(transform.position,
+        transform.position = Vector3.LerpUnclamped(transform.position,
                 predictedPlayerPos, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
     }
 }

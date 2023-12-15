@@ -231,6 +231,7 @@ public class DataToHandle
 public class InputData : PlayerID
 {
     public int tick;
+    [FormerlySerializedAs("front")] public int forward;
     public int right;
     public bool jump;
 }
@@ -238,7 +239,7 @@ public class InputData : PlayerID
 [Serializable]
 public class PlayerID
 {
-    public int playerID;
+    public int playerID = -1;
 }
 
 [Serializable]

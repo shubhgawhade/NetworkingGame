@@ -46,11 +46,9 @@ public class HandleDataServer : MonoBehaviour
         }
     }
 
-    private InputData inputData;
+    private InputData[] inputData;
     private async void FixedUpdate()
     {
-        // networkTimer.Update(Time.deltaTime);
-
         while (networkTimer.ShouldTick()) 
         {
             // print(networkTimer.CurrentTick + $" - {DateTime.UtcNow.Second}:{DateTime.UtcNow.Millisecond}");
@@ -61,23 +59,31 @@ public class HandleDataServer : MonoBehaviour
 
             while (inputQueue.Count > 0)
             {
-                inputData = inputQueue.Dequeue();
-
-                // foreach (GameObject o in ObjectsInScene)
-                for(int i=0; i<ExternServer.ConnectedPlayers.Count; i++)
+                if (inputData == null)
                 {
-                    if (ObjectsInScene[i].GetComponent<OnlinePlayerController>().id == inputData.playerID)
+                    inputData = new InputData[ExternServer.ConnectedPlayers.Count];
+                }
+                
+                InputData peekInputQueue = inputQueue.Peek();
+                inputData[peekInputQueue.playerID] = inputQueue.Dequeue();
+                
+                // foreach (GameObject o in ObjectsInScene)
+                for (int i = 0; i < ExternServer.ConnectedPlayers.Count; i++)
+                {
+                    if(inputData[i] == null) continue;
+                    
+                    if (ObjectsInScene[i].GetComponent<OnlinePlayerController>().id == inputData[i].playerID)
                     {
                         // print(o.name);
-                        if (inputData.tick < lastProcessedTick[inputData.playerID])
+                        if (inputData[i].tick < lastProcessedTick[inputData[i].playerID])
                         {
-                            while ((stateBuffer[i][lastProcessedTick[inputData.playerID]].position - ObjectsInScene[i].transform.position)
+                            while ((stateBuffer[i][lastProcessedTick[inputData[i].playerID]].position - ObjectsInScene[i].transform.position)
                                    .magnitude > 0.1f)
                             {
                                 // o.transform.position = Vector3.Lerp(o.transform.position,
                                 //     stateBuffer[lastProcessedTick[inputData.playerID]].position, Time.fixedDeltaTime);
 
-                                ObjectsInScene[i].transform.position = stateBuffer[i][lastProcessedTick[inputData.playerID]].position;
+                                ObjectsInScene[i].transform.position = stateBuffer[i][lastProcessedTick[inputData[i].playerID]].position;
                             }
                             // o.GetComponent<Rigidbody>().velocity = stateBuffer[lastProcessedTick].velocity;
                         }
@@ -120,35 +126,38 @@ public class HandleDataServer : MonoBehaviour
             // foreach (GameObject o in ObjectsInScene)
             for (int i = 0; i < ExternServer.ConnectedPlayers.Count; i++)
             {
+                if(inputData[i] == null) continue;
+                
                 // print(o.name);
-                if (ObjectsInScene[i].GetComponent<OnlinePlayerController>().id == inputData.playerID)
+                if (ObjectsInScene[i].GetComponent<OnlinePlayerController>().id == inputData[i].playerID)
                 {
                     if (networkTimer.CurrentTick == 0)
                     {
-                        inputData.tick = 0;
+                        inputData[i].tick = 0;
                     }
                     
                     // Add to Input Queue with tick number
                         
                     // print(inputData.playerID);
-                    float move = inputData.right;
-                    while (inputData.tick <= networkTimer.CurrentTick)
+                    float move = inputData[i].right;
+                    while (inputData[i].tick <= networkTimer.CurrentTick)
                     {
+                    
+                        print($"CT {inputData[i].tick} : NT {networkTimer.CurrentTick}");
+                        stateBuffer[i][inputData[i].tick] = new StatePayload
+                        {
+                            tick = inputData[i].tick,
+                            position = ObjectsInScene[i].transform.position,
+                            // rb = o.GetComponent<Rigidbody>()ss
+                            // velocity = o.GetComponent<Rigidbody>().velocity
+                        };
+                        lastProcessedTick[inputData[i].playerID] = inputData[i].tick;
+                        
                         // Physics.simulationMode = SimulationMode.Script;
                         print(move);
                         // Physics.Simulate(networkTimer.MinTimeBetweenTicks);
                         ObjectsInScene[i].GetComponent<OnlinePlayerController>().Move(move, networkTimer.MinTimeBetweenTicks);
                         // Physics.simulationMode = SimulationMode.FixedUpdate;
-                    
-                        print($"CT {inputData.tick} : NT {networkTimer.CurrentTick}");
-                        stateBuffer[i][inputData.tick] = new StatePayload
-                        {
-                            tick = inputData.tick,
-                            position = ObjectsInScene[i].transform.position,
-                            // rb = o.GetComponent<Rigidbody>()ss
-                            // velocity = o.GetComponent<Rigidbody>().velocity
-                        };
-                        lastProcessedTick[inputData.playerID] = inputData.tick;
                         
                         // SEND SERVER SIMULATION EVERY 10 ticks = 0.33s, 15 ticks = 0.495s
                         if (networkTimer.CurrentTick % 10 == 0)
@@ -157,7 +166,7 @@ public class HandleDataServer : MonoBehaviour
                             
                             foreach (Player player in server.playersConnected)
                             {
-                                if (player.PlayerID == inputData.playerID)
+                                if (player.PlayerID == inputData[i].playerID)
                                 {
                                     tempPlayer.dataUpdateType = DataUpdateType.Transform;
                                     TransformData td = (TransformData) tempPlayer.returnDataStruct; 
@@ -165,7 +174,7 @@ public class HandleDataServer : MonoBehaviour
                                     td = new TransformData
                                     {
                                         tick = networkTimer.CurrentTick,
-                                        playerID = inputData.playerID,
+                                        playerID = inputData[i].playerID,
                                         pos = new Pos
                                         {
                                             _posX = ObjectsInScene[i].transform.position.x,
@@ -180,7 +189,7 @@ public class HandleDataServer : MonoBehaviour
                             }
                         }
                         
-                        inputData.tick++;
+                        inputData[i].tick++;
                     }
                     
                     // while (inputData.tick < networkTimer.CurrentTick)
@@ -330,11 +339,11 @@ public class HandleDataServer : MonoBehaviour
                 
                 case DataUpdateType.Input:
 
-                    InputData inputData = (InputData) data.deserializedData;
+                    InputData inputDataRecd = (InputData) data.deserializedData;
 
                     // print(inputData.right);
 
-                    inputQueue.Enqueue(inputData);
+                    inputQueue.Enqueue(inputDataRecd);
                     // foreach (GameObject o in ObjectsInScene)
                     // {
                     //     print(o.name);
