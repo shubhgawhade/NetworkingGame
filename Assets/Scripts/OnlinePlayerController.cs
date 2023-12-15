@@ -192,8 +192,11 @@ public class OnlinePlayerController : MonoBehaviour
     private Vector3 predictedPlayerPos;
     public bool ShouldReconcile(TransformData transformData)
     {
-        if (!isOwner) return false;
-        
+        if (!isOwner)
+        {
+            return false;
+        }
+
         int dataTick = transformData.tick;
         tempPos = new Vector3(transformData.pos._posX, transformData.pos._posY,
             transformData.pos._posZ);

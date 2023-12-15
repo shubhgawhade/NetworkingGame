@@ -18,6 +18,9 @@ public class ProcessDataClient : MonoBehaviour
         
     }
 
+    private bool updateOtherPos;
+    private TransformData otherPayersPos;
+    
     // Update is called once per frame
     void Update()
     {
@@ -198,14 +201,20 @@ public class ProcessDataClient : MonoBehaviour
                         {
                             if (!o.GetComponent<OnlinePlayerController>().ShouldReconcile(transformData))
                             {
-                                Vector3 tempPos = new Vector3(transformData.pos._posX, transformData.pos._posY,
-                                    transformData.pos._posZ);
-                                
-                                while ((tempPos - o.transform.position).magnitude > 0.3f)
-                                {
-                                    o.transform.position = Vector3.Lerp(o.transform.position,
-                                        tempPos, client.networkTimer.MinTimeBetweenTicks);
-                                }
+                                updateOtherPos = true;
+                                otherPayersPos = transformData;
+                                // Vector3 tempPos = new Vector3(transformData.pos._posX, transformData.pos._posY,
+                                //     transformData.pos._posZ);
+                                //
+                                // while ((tempPos - o.transform.position).magnitude > 0.3f)
+                                // {
+                                //     o.transform.position = Vector3.Lerp(o.transform.position,
+                                //         tempPos, client.networkTimer.MinTimeBetweenTicks);
+                                // }
+                            }
+                            else
+                            {
+                                updateOtherPos = true;
                             }
                             // o.transform.position = tempPos;
                         }
@@ -220,6 +229,23 @@ public class ProcessDataClient : MonoBehaviour
                     }
                 
                     break;
+            }
+        }
+
+        if (updateOtherPos && otherPayersPos != null)
+        {
+            foreach (GameObject o in client.objectsInScene)
+            {
+                if (o.GetComponent<OnlinePlayerController>().id == otherPayersPos.playerID)
+                {
+                    Vector3 tempPos = new Vector3(otherPayersPos.pos._posX, otherPayersPos.pos._posY,
+                        otherPayersPos.pos._posZ);
+                    // while ((tempPos - o.transform.position).magnitude > 0.3f)
+                    {
+                        o.transform.position = Vector3.Lerp(o.transform.position,
+                            tempPos, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
+                    }
+                }
             }
         }
         
