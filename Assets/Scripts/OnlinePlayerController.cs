@@ -10,8 +10,9 @@ public class OnlinePlayerController : MonoBehaviour
     public bool isOwner;
     private Rigidbody rb;
 
-    private float moveForce = 30;
-    private float moveSpeed = 2;
+    // private float moveForce = 30;
+    private float moveSpeed = 4;
+    private Vector3 lastMoveSent;
 
     private InputData inputData;
 
@@ -38,6 +39,11 @@ public class OnlinePlayerController : MonoBehaviour
             ClientGameManager.client.localPlayer.dataUpdateType = DataUpdateType.Input;
             inputData = (InputData)ClientGameManager.client.localPlayer.returnDataStruct;
             inputData.playerID = id;
+        }
+        
+        if (isOwner)
+        {
+            transform.GetChild(0).gameObject.SetActive(true);
         }
     }
 
@@ -76,7 +82,7 @@ public class OnlinePlayerController : MonoBehaviour
                 {
                     inputData.right = 1;
 
-                    sendInputQueue.Enqueue(inputData);
+                    // sendInputQueue.Enqueue(inputData);
                 }
             }
             else if (horizontalInput < 0)
@@ -85,9 +91,10 @@ public class OnlinePlayerController : MonoBehaviour
                 {    
                     inputData.right = -1;
                     
-                    sendInputQueue.Enqueue(inputData);
+                    // sendInputQueue.Enqueue(inputData);
                 }
             }
+            
             
             if (verticalInput > 0)
             {
@@ -95,7 +102,7 @@ public class OnlinePlayerController : MonoBehaviour
                 {
                     inputData.forward = 1;
 
-                    sendInputQueue.Enqueue(inputData);
+                    // sendInputQueue.Enqueue(inputData);
                 }
             }
             else if (verticalInput < 0)
@@ -104,29 +111,46 @@ public class OnlinePlayerController : MonoBehaviour
                 {    
                     inputData.forward = -1;
                     
-                    sendInputQueue.Enqueue(inputData);
+                    // sendInputQueue.Enqueue(inputData);
                 }
             }
         }
-        else
+        
+        if (horizontalInput == 0 || verticalInput == 0)
         {
-            if(inputData.right != 0)
+            if (horizontalInput == 0)
             {
-                inputData.right = 0;
-                
-                sendInputQueue.Enqueue(inputData);
+                if(inputData.right != 0)
+                {
+                    inputData.right = 0;
+                    
+                    // sendInputQueue.Enqueue(inputData);
+                }
             }
 
-            if (inputData.forward != 0)
+            if (verticalInput == 0)
             {
-                inputData.forward = 0;
-                
-                sendInputQueue.Enqueue(inputData);
+                if (inputData.forward != 0)
+                {
+                    inputData.forward = 0;
+                    
+                    // sendInputQueue.Enqueue(inputData);
+                }
             }
         }
         
         positionBuffer[ClientGameManager.client.networkTimer.CurrentTick] = transform.position;
-        Move(inputData.right, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
+        
+        Vector3 moveDir = new Vector3(inputData.right, 0, inputData.forward);
+
+        if (moveDir != lastMoveSent)
+        {
+            inputData.tick = ClientGameManager.client.networkTimer.CurrentTick;
+            sendInputQueue.Enqueue(inputData);
+            lastMoveSent = moveDir;
+        }
+        
+        Move(moveDir, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
     }
     
     // Update is called once per frame
@@ -177,7 +201,7 @@ public class OnlinePlayerController : MonoBehaviour
             inputBuffer[ClientGameManager.client.networkTimer.CurrentTick] = inputs;
 
             ClientGameManager.client.localPlayer.dataUpdateType = DataUpdateType.Input;
-            inputData.tick = ClientGameManager.client.networkTimer.CurrentTick;
+            // inputData.tick = ClientGameManager.client.networkTimer.CurrentTick;
             ClientGameManager.client.localPlayer.dataToSend =
                 ClientGameManager.client.localPlayer.ObjectToByteArray(inputs);
             await SendData.Send(ClientGameManager.client.localPlayer, ClientGameManager.client.localPlayer.dataToSend,
@@ -185,10 +209,10 @@ public class OnlinePlayerController : MonoBehaviour
         }
     }
 
-    public void Move(float horizontalInput, float timeBetweenTicks)
+    public void Move(Vector3 moveDir, float timeBetweenTicks)
     {
         // print(horizontalInput);
-        Vector3 moveDir = new Vector3(horizontalInput, 0, 0);
+        
         moveDir.Normalize();
         transform.position += moveDir * (moveSpeed * timeBetweenTicks);
         // rb.AddForce(moveDir * (moveForce * timeBetweenTIcks), ForceMode.VelocityChange);
@@ -210,7 +234,8 @@ public class OnlinePlayerController : MonoBehaviour
         // Simulate from the new position to current tick and then check if reconciliation needed
         while (dataTick <= ClientGameManager.client.networkTimer.CurrentTick)
         {
-            Vector3 moveDir = new Vector3(inputBuffer[dataTick].right, 0, 0);
+            Vector3 moveDir = new Vector3(inputBuffer[dataTick].right, 0, inputBuffer[dataTick].forward);
+            moveDir.Normalize();
             predictedPlayerPos = tempPos +
                            moveDir * (moveSpeed * ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
 

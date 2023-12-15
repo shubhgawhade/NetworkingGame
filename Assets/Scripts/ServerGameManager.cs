@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -9,9 +10,13 @@ public class ServerGameManager : MonoBehaviour
     [SerializeField] private GameObject playerPrefab;
     
     private HandleDataServer _handleDataServer;
+
+    private GameObject serverCam;
+    private Vector3 serverCamPos;
     
     private void Awake()
     {
+        serverCamPos = new Vector3(0, 2.25f, -10);
         _handleDataServer = GetComponent<HandleDataServer>();
     }
 
@@ -37,10 +42,21 @@ public class ServerGameManager : MonoBehaviour
                 case GameState.gameStateEnum.Game:
 
                     SceneManager.LoadScene(1);
-                    // SpawnPlayers();
+                    StartCoroutine(CreateServerCamera());
                     
                     break;
             }
         }
+    }
+
+    IEnumerator CreateServerCamera()
+    {
+        yield return new WaitForSeconds(0.001f);
+        serverCam = new GameObject
+        {
+            name = "SererCamera",
+            transform = { position = serverCamPos}
+        };
+        serverCam.AddComponent<Camera>();
     }
 }

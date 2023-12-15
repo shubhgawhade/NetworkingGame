@@ -23,8 +23,6 @@ public class HandleDataServer : MonoBehaviour
     {
         public int tick;
         public Vector3 position;
-        public Quaternion rotation;
-        public Vector3 velocity;
     };
     
     public StatePayload[][] stateBuffer;
@@ -139,7 +137,6 @@ public class HandleDataServer : MonoBehaviour
                     // Add to Input Queue with tick number
                         
                     // print(inputData.playerID);
-                    float move = inputData[i].right;
                     while (inputData[i].tick <= networkTimer.CurrentTick)
                     {
                     
@@ -147,17 +144,12 @@ public class HandleDataServer : MonoBehaviour
                         stateBuffer[i][inputData[i].tick] = new StatePayload
                         {
                             tick = inputData[i].tick,
-                            position = ObjectsInScene[i].transform.position,
-                            // rb = o.GetComponent<Rigidbody>()ss
-                            // velocity = o.GetComponent<Rigidbody>().velocity
+                            position = ObjectsInScene[i].transform.position
                         };
                         lastProcessedTick[inputData[i].playerID] = inputData[i].tick;
                         
-                        // Physics.simulationMode = SimulationMode.Script;
-                        print(move);
-                        // Physics.Simulate(networkTimer.MinTimeBetweenTicks);
-                        ObjectsInScene[i].GetComponent<OnlinePlayerController>().Move(move, networkTimer.MinTimeBetweenTicks);
-                        // Physics.simulationMode = SimulationMode.FixedUpdate;
+                        Vector3 moveDir = new Vector3(inputData[i].right, 0, inputData[i].forward);
+                        ObjectsInScene[i].GetComponent<OnlinePlayerController>().Move(moveDir, networkTimer.MinTimeBetweenTicks);
                         
                         // SEND SERVER SIMULATION EVERY 10 ticks = 0.33s, 15 ticks = 0.495s
                         if (networkTimer.CurrentTick % 10 == 0)
