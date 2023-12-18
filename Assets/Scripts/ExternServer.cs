@@ -37,6 +37,11 @@ public class ExternServer : MonoBehaviour
         // print(CONNECTIONS[0].data.pos._posX);
     }
 
+    private void OnDestroy()
+    {
+        AsynchronousSocketListener.SD();
+    }
+
     private void OnApplicationQuit()
     {
         AsynchronousSocketListener.SD();

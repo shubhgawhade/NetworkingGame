@@ -10,13 +10,14 @@ GameObject:
   m_Component:
   - component: {fileID: 871732265807938886}
   - component: {fileID: -1786450893000997131}
+  - component: {fileID: 5351569770675199026}
   m_Layer: 0
   m_Name: ClientNew
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &871732265807938886
 Transform:
   m_ObjectHideFlags: 0
@@ -44,20 +45,43 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5bb07bd3883bbe4586cb5517d25f2d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  tickSynced: 0
+  pingTimer: 0
   localPlayer:
     playerName: 
     PlayerID: 0
     ready: 0
+    canControl: 0
+    score: 0
+    playerOwnedObjects: []
     dataRecd: 00000000
     dataToSend: 00000000
     dataUpdateType: 0
   clientStatus: 0
   playersConnected: []
-  timeSinceLastSend: 0
-  ServerPlayer:
+  objectsInScene: []
+  OnlinePlayer:
     playerName: 
     PlayerID: 0
     ready: 0
+    canControl: 0
+    score: 0
+    playerOwnedObjects: []
     dataRecd: 00000000
     dataToSend: 00000000
     dataUpdateType: 0
+--- !u!114 &5351569770675199026
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7515890535252095814}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3e97243572bce84aa0f432e82e0f8f3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerPrefab: {fileID: 3431105083004858709, guid: d65fafc2ea1e6d248b8e1664105c08d6, type: 3}
+  coinPrefab: {fileID: 7483907110487895655, guid: bddde96586ad17d4490632b9a89409b2, type: 3}
+  positionInfo: []

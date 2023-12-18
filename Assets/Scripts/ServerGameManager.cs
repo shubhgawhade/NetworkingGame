@@ -6,13 +6,16 @@ using UnityEngine.Serialization;
 
 public class ServerGameManager : MonoBehaviour
 {
-    public List<GameObject> ObjectsInScene = new List<GameObject>();
     [SerializeField] private GameObject playerPrefab;
     
     private HandleDataServer _handleDataServer;
 
     private GameObject serverCam;
     private Vector3 serverCamPos;
+    
+    [SerializeField] private GameObject lobbyCanvas;
+    [SerializeField] private GameObject inGameUICanvas;
+    [SerializeField] private GameObject joinLobbyCanvas;
     
     private void Awake()
     {
@@ -37,11 +40,29 @@ public class ServerGameManager : MonoBehaviour
             {
                 case GameState.gameStateEnum.Lobby:
                     
+                    if (SceneManager.GetActiveScene().buildIndex != 0)
+                    {
+                        Destroy(lobbyCanvas.transform.parent.gameObject);
+                        Destroy(_handleDataServer.gameObject);
+                        
+                        SceneManager.LoadScene(0);
+                    }
+                    
+                    lobbyCanvas.SetActive(true);
+                    joinLobbyCanvas.SetActive(false);
+                    
                     break;
                 
                 case GameState.gameStateEnum.Game:
 
-                    SceneManager.LoadScene(1);
+                    if (SceneManager.GetActiveScene().buildIndex != 1)
+                    {
+                        SceneManager.LoadScene(1);
+                    }
+                    
+                    lobbyCanvas.SetActive(false);
+                    inGameUICanvas.SetActive(true);
+                    
                     StartCoroutine(CreateServerCamera());
                     
                     break;
@@ -54,7 +75,7 @@ public class ServerGameManager : MonoBehaviour
         yield return new WaitForSeconds(0.001f);
         serverCam = new GameObject
         {
-            name = "SererCamera",
+            name = "ServerCamera",
             transform = { position = serverCamPos}
         };
         serverCam.AddComponent<Camera>();

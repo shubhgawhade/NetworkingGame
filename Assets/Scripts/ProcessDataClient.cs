@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class ProcessDataClient : MonoBehaviour
@@ -6,6 +7,13 @@ public class ProcessDataClient : MonoBehaviour
     private ClientNew client;
     
     [SerializeField] private GameObject playerPrefab;
+    [SerializeField] private GameObject coinPrefab;
+
+    // [SerializeField] private UIManager uiManager;
+
+    private int tickToStartGame = -1;
+    private int gameLength;
+    public static Action<int> StartInGameTimer;
 
     private void Awake()
     {
@@ -20,7 +28,17 @@ public class ProcessDataClient : MonoBehaviour
 
     private bool updateOtherPos;
     private TransformData[] otherPayersPos;
-
+    
+    // [Serializable]
+    // public class PositionInfo
+    // {
+    //     public Queue<TransformData> transformData = new Queue<TransformData>();
+    // }
+    //
+    // public PositionInfo[] positionInfo;
+    // private TransformData[] prevTransforms = new TransformData[2];
+    // private Vector3[] prevlocations = new Vector3[2];
+    
     private void FixedUpdate()
     {
         if (updateOtherPos && otherPayersPos != null)
@@ -42,6 +60,61 @@ public class ProcessDataClient : MonoBehaviour
                 }
             }
         }
+        
+        // if (updateOtherPos)
+        // {
+        //     for (int i = 0; i < client.objectsInScene.Count; i++)
+        //     {
+        //         if(positionInfo[i] == null) continue;
+        //
+        //         while (positionInfo[i].transformData.Count > 2)
+        //         {
+        //             for (int j = 0; j < 2; j++)
+        //             {
+        //                 prevTransforms[j] = positionInfo[i].transformData.Dequeue();
+        //                 prevlocations[j] = new Vector3(prevTransforms[j].pos._posX, prevTransforms[j].pos._posY,
+        //                     prevTransforms[j].pos._posZ);
+        //             }
+        //
+        //             
+        //             
+        //             // if (transformData != null)
+        //             // {
+        //             //     if (client.objectsInScene[i].GetComponent<OnlinePlayerController>().id == transformData.playerID)
+        //             //     {
+        //             //         Vector3 tempPos = new Vector3(transformData.pos._posX, transformData.pos._posY,
+        //             //             transformData.pos._posZ);
+        //             //         // while ((tempPos - o.transform.position).magnitude > 0.3f)
+        //             //         {
+        //             //             client.objectsInScene[i].transform.position = Vector3.LerpUnclamped(client.objectsInScene[i].transform.position,
+        //             //                 tempPos, client.networkTimer.MinTimeBetweenTicks);
+        //             //         }
+        //             //     }
+        //             // }
+        //         }
+        //         
+        //         foreach (TransformData prevTransform in prevTransforms)
+        //         {
+        //             if (prevTransform == null)
+        //             {
+        //                 return;
+        //             }
+        //         }
+        //             
+        //         Vector3 speed = (prevlocations[1] - prevlocations[0]) / (prevTransforms[1].tick - prevTransforms[0].tick);
+        //         speed.Normalize();
+        //                  
+        //         while (prevTransforms[1].tick < client.networkTimer.CurrentTick)
+        //         {
+        //             client.objectsInScene[i].transform.position = Vector3.LerpUnclamped(client.objectsInScene[i].transform.position,
+        //                 prevlocations[1] + speed, client.networkTimer.MinTimeBetweenTicks);
+        //             // client.objectsInScene[i].transform.position += speed * (3 * client.networkTimer.MinTimeBetweenTicks);
+        //
+        //             prevTransforms[1].tick++;
+        //         }
+        //
+        //     }
+        // }
     }
 
     // Update is called once per frame
@@ -88,8 +161,8 @@ public class ProcessDataClient : MonoBehaviour
                         {
                             // float ping = client.pingTimer / 2;
                             // float setTimer = (ping + joinLeaveData.subTick) % 1.0f/30;
-                            int a = (int)Mathf.Floor((client.pingTimer / 4 + joinLeaveData.subTick) / (1.0f/30));
-                            client.networkTimer = new NetworkTimer(30, joinLeaveData.tick + a, 
+                            int a = (int)Mathf.Floor((client.pingTimer/4 + joinLeaveData.subTick) / (1.0f/30));
+                            client.networkTimer = new NetworkTimer(30, joinLeaveData.tick + a +1, 
                                 client.pingTimer / 2 + joinLeaveData.subTick);
                         }
                         else
@@ -205,12 +278,30 @@ public class ProcessDataClient : MonoBehaviour
                             }
                         
                             break;
+                        
+                        // case ObjectType.Coin:
+                        //
+                        //     foreach (OwnedObject coin in coinList)
+                        //     {
+                        //         Vector3 coinPos = new Vector3(coin.startPos._posX, coin.startPos._posY,
+                        //             coin.startPos._posZ);
+                        //             
+                        //         Instantiate(coinPrefab, coinPos, Quaternion.identity); 
+                        //     }
+                        //     
+                        //     break;
                     
                         // case ObjectType.Bullet
                     }
-
-                    
                 
+                    break;
+                
+                case DataUpdateType.StartGame:
+                    
+                    StartGameData startGameData = (StartGameData) data.deserializedData;
+                    tickToStartGame = startGameData.tickAtSceneLoad;
+                    gameLength = startGameData.gameLengthInSeconds;
+                    
                     break;
                 
                 case DataUpdateType.Transform:
@@ -226,12 +317,23 @@ public class ProcessDataClient : MonoBehaviour
                             if (!client.objectsInScene[i].GetComponent<OnlinePlayerController>().ShouldReconcile(transformData))
                             {
                                 updateOtherPos = true;
+
                                 if (otherPayersPos == null)
                                 {
                                     otherPayersPos = new TransformData[client.objectsInScene.Count];
                                 }
                                 
                                 otherPayersPos[i] = transformData;
+                                
+                                
+                                // if (positionInfo.Length == 0)
+                                // {
+                                //     positionInfo = new PositionInfo[client.objectsInScene.Count];
+                                //     positionInfo[i] = new PositionInfo();
+                                // }
+                                //
+                                // positionInfo[i].transformData.Enqueue(transformData);
+                                
                                 // Vector3 tempPos = new Vector3(transformData.pos._posX, transformData.pos._posY,
                                 //     transformData.pos._posZ);
                                 //
@@ -243,7 +345,7 @@ public class ProcessDataClient : MonoBehaviour
                             }
                             else
                             {
-                                updateOtherPos = true;
+                                // updateOtherPos = true;
                             }
                             // o.transform.position = tempPos;
                         }
@@ -258,7 +360,35 @@ public class ProcessDataClient : MonoBehaviour
                     }
                 
                     break;
+                
+                case DataUpdateType.PointsData:
+                    
+                    PointsData pointsData = (PointsData) data.deserializedData;
+                    foreach (Player player in client.playersConnected)
+                    {
+                        if (player.PlayerID == pointsData.playerID)
+                        {
+                            player.score = pointsData.score;
+                        }
+                    }
+
+                    foreach (Coin coin in CoinSpawner.CoinsList)
+                    {
+                        if (coin.id == pointsData.coinId)
+                        {
+                            coin.coinObject.SetActive(false);
+                        }
+                    }
+                    
+                    break;
             }
+        }
+
+        if (client.networkTimer != null && client.networkTimer.CurrentTick == tickToStartGame)
+        {
+            StartInGameTimer(gameLength);
+            client.localPlayer.canControl = true;
+            tickToStartGame = -1;
         }
         
         // if (player.receivedData)

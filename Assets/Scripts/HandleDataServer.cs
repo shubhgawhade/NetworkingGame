@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
+using Random = UnityEngine.Random;
 
 public class HandleDataServer : MonoBehaviour
 {
@@ -18,6 +20,8 @@ public class HandleDataServer : MonoBehaviour
 
     public Queue<InputData> inputQueue = new Queue<InputData>();
     
+    public bool acceptNewConnections = true;
+
     [Serializable]
     public struct StatePayload
     {
@@ -140,7 +144,7 @@ public class HandleDataServer : MonoBehaviour
                     while (inputData[i].tick <= networkTimer.CurrentTick)
                     {
                     
-                        print($"CT {inputData[i].tick} : NT {networkTimer.CurrentTick}");
+                        // print($"CT {inputData[i].tick} : NT {networkTimer.CurrentTick}");
                         stateBuffer[i][inputData[i].tick] = new StatePayload
                         {
                             tick = inputData[i].tick,
@@ -221,6 +225,16 @@ public class HandleDataServer : MonoBehaviour
         {
             print("SERVER Q COUNT : " + server.receivedDataToHandle.Count);
         }
+
+        if (server.playersConnected.Count == 0)
+        {
+            gameState.ChangeState(GameState.gameStateEnum.Lobby);
+
+            foreach (GameObject o in ObjectsInScene)
+            {
+                Destroy(o);
+            }
+        }
         
         while (server.receivedDataToHandle.Count > 0)
         {
@@ -238,7 +252,7 @@ public class HandleDataServer : MonoBehaviour
                         
                         JoinLeaveData joinLeaveData = (JoinLeaveData) data.player.returnDataStruct;
 
-                        if (_playerIDs.Count == 0)
+                        if (_playerIDs.Count == 0 || !acceptNewConnections)
                         {
                             Debug.LogWarning($"{data.player.playerName} tried to join when SERVER HAS MAX PLAYERS");
                             // MAX PLAYERS : SEND DISCONNECTION
@@ -302,7 +316,8 @@ public class HandleDataServer : MonoBehaviour
                     data.player.dataToSend = data.player.ObjectToByteArray(readyStatus);
                     SendData.Send(data.player, data.player.dataToSend, SendData.SendType.ReplyAll);
 
-                    // if (playersConnected.Count > 1)
+                    // UNCOMMENT FOR MINIMUM 2 PLAYERS
+                    // if (ExternServer.ConnectedPlayers.Count > 1)
                     {
                         bool allReady = false;
                         foreach (Player player in server.playersConnected)
@@ -314,19 +329,64 @@ public class HandleDataServer : MonoBehaviour
                             }
 
                             allReady = true;
-                            
                         }
                         
                         if (allReady)
                         {
+                            acceptNewConnections = false;
+
                             print("Start Game");
 
                             StartCoroutine(Wait());
+                            
 
                             gameState.ChangeState(GameState.gameStateEnum.Game);
+                            
+                            foreach (Player player in server.playersConnected)
+                            {
+                                // RESET READY TO USE WHEN ALL PLAYERS LOAD GAME SCENE TO START TIMER
+                                player.ready = false;
+                            }
                         }
                     }
                 
+                    break;
+                
+                case DataUpdateType.StartGame:
+                    
+                    StartGameData startGameData = (StartGameData) data.deserializedData;
+                    data.player.ready = true;
+
+                    int lastJoinTick;
+                    bool hasLoadedGame = false;
+                    foreach (Player player in server.playersConnected)
+                    {
+                        if (!player.ready)
+                        {
+                            hasLoadedGame = false;
+                            break;
+                        }
+
+                        hasLoadedGame = true;
+                    }
+
+                    if (hasLoadedGame)
+                    {
+                        lastJoinTick = startGameData.tickAtSceneLoad;
+
+                        startGameData.gameLengthInSeconds = 300;
+                        // Send a future tick greater than twice the difference of lastJoinTick and current tick
+                        startGameData.tickAtSceneLoad =
+                            (networkTimer.CurrentTick + (networkTimer.CurrentTick - lastJoinTick)) %
+                            networkTimer.MaxTick;
+                        
+                        print(networkTimer.CurrentTick - lastJoinTick);
+                        
+                        print($"START TIMER TICK {startGameData.tickAtSceneLoad}");
+                        data.player.dataToSend = data.player.ObjectToByteArray(startGameData);
+                        SendData.Send(data.player, data.player.dataToSend, SendData.SendType.ReplyAll);
+                    }
+                    
                     break;
                 
                 case DataUpdateType.Input:
@@ -381,14 +441,20 @@ public class HandleDataServer : MonoBehaviour
         }
     }
 
+    [SerializeField] private GameObject[] placedCoins;
     IEnumerator Wait()
     {
         yield return new WaitForSeconds(2);
         SpawnPlayers();
+        
+        // SPAWN COINS
+        // SpawnCoins();
     }
     
     public List<GameObject> ObjectsInScene = new List<GameObject>();
     [SerializeField] private GameObject playerPrefab;
+    [SerializeField] private GameObject coinPrefab;
+    [SerializeField] private GameObject[] coinsArray;
     
     async void SpawnPlayers()
     {
@@ -408,6 +474,7 @@ public class HandleDataServer : MonoBehaviour
             };
             ownedObject.playerID = ExternServer.ConnectedPlayers[i].PlayerID;
             temp.GetComponent<OnlinePlayerController>().id = ownedObject.playerID;
+            temp.AddComponent<ServerActions>();
             
             // Send connected players,their objects to spawn
             ExternServer.ConnectedPlayers[i].dataUpdateType = DataUpdateType.OwnedObject;
@@ -416,6 +483,60 @@ public class HandleDataServer : MonoBehaviour
                 SendData.SendType.ReplyAll);
         }
     }
+
+    // async void SpawnCoins()
+    // {
+    //     int numberOfCoins = 15;
+    //     coinsArray = new GameObject[15];
+    //     
+    //     for (int i = 0; i < 15; i++)
+    //     {
+    //         Vector3 tempCoinPos = Vector3.zero;
+    //         
+    //         int collisions;
+    //         do
+    //         {
+    //             tempCoinPos = new Vector3(Random.Range(-10, 10), 0, Random.Range(-10, 10));
+    //             Collider[] col = Physics.OverlapBox(tempCoinPos, coinPrefab.transform.localScale / 2, Quaternion.identity);
+    //             collisions = col.Length;
+    //
+    //         } while (collisions > 1);
+    //         
+    //         GameObject tempCoin = Instantiate(coinPrefab, tempCoinPos, Quaternion.identity);
+    //         OwnedObject ownedObject =
+    //             RegisterObject(tempCoin, ObjectType.Coin);
+    //         ownedObject.startPos = new Pos
+    //         {
+    //             _posX = tempCoinPos.x,
+    //             _posY = tempCoinPos.y,
+    //             _posZ = tempCoinPos.z
+    //         };
+    //         
+    //         coinsArray[i] = tempCoin;
+    //         
+    //         ExternServer.ConnectedPlayers[0].dataUpdateType = DataUpdateType.OwnedObject;
+    //         ExternServer.ConnectedPlayers[0].dataToSend = ExternServer.ConnectedPlayers[0].ObjectToByteArray(ownedObject);
+    //         await SendData.Send(ExternServer.ConnectedPlayers[0], ExternServer.ConnectedPlayers[0].dataToSend,
+    //             SendData.SendType.ReplyAll);
+    //     }
+    //     
+    //     // foreach (GameObject placedCoin in placedCoins)
+    //     // {
+    //     //     OwnedObject ownedObject =
+    //     //         RegisterObject(placedCoin, ObjectType.Coin);
+    //     //     ownedObject.startPos = new Pos
+    //     //     {
+    //     //         _posX = placedCoin.transform.position.x,
+    //     //         _posY = placedCoin.transform.position.y,
+    //     //         _posZ = placedCoin.transform.position.z
+    //     //     };
+    //     //     
+    //     //     ExternServer.ConnectedPlayers[0].dataUpdateType = DataUpdateType.OwnedObject;
+    //     //     ExternServer.ConnectedPlayers[0].dataToSend = ExternServer.ConnectedPlayers[0].ObjectToByteArray(ownedObject);
+    //     //     await SendData.Send(ExternServer.ConnectedPlayers[0], ExternServer.ConnectedPlayers[0].dataToSend,
+    //     //         SendData.SendType.ReplyAll);
+    //     // }
+    // }
 
     private OwnedObject RegisterObject(Player player, GameObject objToOwn)
     {

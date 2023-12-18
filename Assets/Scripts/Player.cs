@@ -30,6 +30,7 @@ public enum DataUpdateType
     OwnedObject,
     Input,
     Transform,
+    PointsData,
     Heath
 }
 
@@ -43,6 +44,9 @@ public class Player
     public int PlayerID;
 
     public bool ready;
+    public bool canControl;
+
+    public int score;
 
     public List<OwnedObject> playerOwnedObjects = new List<OwnedObject>();
     
@@ -105,6 +109,13 @@ public class Player
 
                 TransformData td = new TransformData();
                 return td;
+                
+                break;
+            
+            case DataUpdateType.PointsData:
+
+                PointsData pd = new PointsData();
+                return pd;
                 
                 break;
         }
@@ -199,12 +210,19 @@ public class Player
                     return transformData;
                     
                     break;
+                
+                case DataUpdateType.PointsData:
+                    
+                    PointsData pointsData = (PointsData) binaryFormatter.Deserialize(memoryStream);
+                    return pointsData;
+                    
+                    break;
             }
         }
         catch (Exception e)
         {
             Debug.LogWarning(e + $"{dataUpdateType}");
-            throw;
+            // throw;
         }
 
         return null;
@@ -274,6 +292,7 @@ public class ReadyStatus : PlayerID
 public enum ObjectType
 {
     Player,
+    Coin,
     Bullet
 }
 
@@ -284,9 +303,11 @@ public class OwnedObject : PlayerID
     public Pos startPos;
 }
 
+[Serializable]
 public class StartGameData : PlayerID
 {
-    
+    public int tickAtSceneLoad;
+    public int gameLengthInSeconds;
 }
 
 [Serializable]
@@ -312,4 +333,11 @@ public class TransformData : PlayerID
     // }
     //
     // public Rot rot;
+}
+
+[Serializable]
+public class PointsData : PlayerID
+{
+    public int coinId;
+    public int score;
 }

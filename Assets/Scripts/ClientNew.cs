@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class ClientNew : MonoBehaviour
 {
@@ -37,7 +38,8 @@ public class ClientNew : MonoBehaviour
         Disconnected
     }
     
-    public float timeSinceLastSend;
+    public Player OnlinePlayer;
+
 
     private void Awake()
     {
@@ -54,7 +56,6 @@ public class ClientNew : MonoBehaviour
     }
     
     // private Byte[] bytes = new Byte[4];
-    public Player ServerPlayer;
 
     // private void FixedUpdate()
     // {
@@ -69,7 +70,7 @@ public class ClientNew : MonoBehaviour
     //         
     //         while (networkTimer.ShouldTick()) 
     //         {
-    //             // print(networkTimer.CurrentTick + $" - {DateTime.UtcNow.Second}:{DateTime.UtcNow.Millisecond}");
+    //             print(networkTimer.CurrentTick + $" - {DateTime.UtcNow.Second}:{DateTime.UtcNow.Millisecond}");
     //             
     //             
     //         }
@@ -91,14 +92,14 @@ public class ClientNew : MonoBehaviour
             pingTimer += Time.deltaTime;
         }
         
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            localPlayer.dataUpdateType = DataUpdateType.Ready;
-            ReadyStatus readyStatus = (ReadyStatus)localPlayer.returnDataStruct;
-            readyStatus.ready = true;
-            localPlayer.dataToSend = localPlayer.ObjectToByteArray(readyStatus);
-            SendData.Send(localPlayer, localPlayer.dataToSend, SendData.SendType.ReplyOne);
-        }
+        // if (Input.GetKeyDown(KeyCode.R))
+        // {
+        //     localPlayer.dataUpdateType = DataUpdateType.Ready;
+        //     ReadyStatus readyStatus = (ReadyStatus)localPlayer.returnDataStruct;
+        //     readyStatus.ready = true;
+        //     localPlayer.dataToSend = localPlayer.ObjectToByteArray(readyStatus);
+        //     SendData.Send(localPlayer, localPlayer.dataToSend, SendData.SendType.ReplyOne);
+        // }
         
         // float horizontalAxis = Input.GetAxis("Horizontal");
         // if (horizontalAxis != 0)
@@ -177,18 +178,18 @@ public class ClientNew : MonoBehaviour
             localPlayer.workSocket = _clientSocket;
             // print(joiningData.playerName);
 
-            ServerPlayer.dataToSend = localPlayer.ObjectToByteArray(joiningData);
+            OnlinePlayer.dataToSend = localPlayer.ObjectToByteArray(joiningData);
             // bytes = ObjectToByteArray(player.data);
             byte[] sizeOfMsg = new byte[sizeof(int)];
-            sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(ServerPlayer.dataToSend.Length.ToString() + (int)localPlayer.dataUpdateType);
-            print($"{ServerPlayer.dataToSend.Length} {localPlayer.dataUpdateType}");
+            sizeOfMsg = System.Text.Encoding.ASCII.GetBytes(OnlinePlayer.dataToSend.Length.ToString() + (int)localPlayer.dataUpdateType);
+            print($"{OnlinePlayer.dataToSend.Length} {localPlayer.dataUpdateType}");
 
             // Send(sizeOfMsg, bytes);
-            await SendData.Send(localPlayer, ServerPlayer.dataToSend, SendData.SendType.ReplyOne);
+            await SendData.Send(localPlayer, OnlinePlayer.dataToSend, SendData.SendType.ReplyOne);
             
             // networkTimer = new NetworkTimer(30);
             
-            ServerPlayer.dataToSend = new byte[sizeof(int)];
+            OnlinePlayer.dataToSend = new byte[sizeof(int)];
 
             // try
             // {
@@ -202,8 +203,8 @@ public class ClientNew : MonoBehaviour
             // }
 
             // ServerPlayer = new Player();
-            _clientSocket.BeginReceive( ServerPlayer.dataRecd, 0, 4, 0, 
-                new AsyncCallback(CheckForDataLength), ServerPlayer);
+            _clientSocket.BeginReceive( OnlinePlayer.dataRecd, 0, 4, 0, 
+                new AsyncCallback(CheckForDataLength), OnlinePlayer);
             pingTimer = 0;
         }
         catch (Exception e)
@@ -338,6 +339,7 @@ public class ClientNew : MonoBehaviour
         
         gameState.ChangeState(GameState.gameStateEnum.JoinScreen);
         
+        DestroyImmediate(gameObject);
     }
     
     private void OnApplicationQuit()

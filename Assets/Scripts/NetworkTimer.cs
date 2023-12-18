@@ -4,11 +4,11 @@ public class NetworkTimer
     public float MinTimeBetweenTicks { get; }
     public int CurrentTick { get; private set; }
     
-    public int MaxTick { get; }
+    public int MaxTick { get; private set; }
 
-    public NetworkTimer(float serverTickRate, int setTickRate = 0, float setTimer = 0)
+    public NetworkTimer(float serverTickRate, int setTickRate = 0, float setTimer = 0, int setMaxTick = 2048)
     {
-        MaxTick = 2048;
+        MaxTick = setMaxTick;
         CurrentTick = setTickRate;
         timer = setTimer;
         MinTimeBetweenTicks = 1f / serverTickRate;
