@@ -290,6 +290,6 @@ public class OnlinePlayerController : MonoBehaviour
     private void Reconcile()
     {
         transform.position = Vector3.LerpUnclamped(transform.position,
-                predictedPlayerPos, moveSpeed * ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
+                predictedPlayerPos, ClientGameManager.client.networkTimer.MinTimeBetweenTicks);
     }
 }
